@@ -15,6 +15,11 @@ If ports 8090, 8081, or 5433 are taken, set `IAP_PORTAL_GATEWAY_PORT`,
 `IAP_PORTAL_IDP_PORT`, and `IAP_PORTAL_DB_PORT` for `docker compose`, and browse to
 the portal on the gateway port you chose.
 
+The mock IdP accepts only registered callback URLs. For custom local URLs, set
+`MOCK_IDP_REDIRECT_URIS` to a comma-separated list of exact callback URLs.
+Compose configures the gateway-port callback automatically. The defaults support
+native port 8088, Compose port 8090, and the documented Minikube hostname.
+
 The inner loop for an app developer working on an app is one command: `iap-portal dev`.
 Three modes, picked with flags — default is native and fast.
 

@@ -71,6 +71,10 @@
           {
             "context": "dependency-review",
             "integration_id": 15368
+          },
+          {
+            "context": "CodeQL",
+            "integration_id": 15368
           }
         ]
       }

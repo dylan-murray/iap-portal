@@ -91,7 +91,7 @@ def test_registration_uses_projected_workload_identity_not_a_shared_secret():
     [source] = job["volumes"][0]["projected"]["sources"]
     token = source["serviceAccountToken"]
     assert token["audience"] == "iap-portal" and token["expirationSeconds"] <= 3600
-    assert "http://portal.iap-portal.svc.cluster.local:8090" in job["containers"][0]["args"][0]
+    assert 'base = "http://portal.iap-portal.svc.cluster.local:8090".rstrip("/")' in job["containers"][0]["args"][0].splitlines()
     accounts = {sa["metadata"]["name"]: sa for sa in kind(docs, "ServiceAccount")}
     assert accounts["iap-portal-registration"]["metadata"]["namespace"] == "iap-app-demo-app"
 

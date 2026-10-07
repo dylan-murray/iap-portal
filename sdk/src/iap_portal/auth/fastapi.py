@@ -42,8 +42,8 @@ from iap_portal.auth.core import (
 def require_user(request: Request) -> User:
     try:
         return user_from_request(request.headers)
-    except AuthError as e:
-        raise HTTPException(401, str(e))
+    except AuthError:
+        raise HTTPException(401, "unauthenticated") from None
 
 
 def _wants_html(request: Request) -> bool:
@@ -192,13 +192,13 @@ class IapPortalAuthMiddleware:
             return
         try:
             user = user_from_request(Headers(scope=scope))
-        except AuthError as e:
+        except AuthError:
             if not self._enforce:
                 await self.app(scope, receive, send)
             elif scope["type"] == "websocket":
                 await send({"type": "websocket.close", "code": 1008, "reason": "unauthorized"})
             else:
-                await unauthorized_response(Request(scope), str(e))(scope, receive, send)
+                await unauthorized_response(Request(scope))(scope, receive, send)
             return
 
         token = set_current(user)

@@ -16,13 +16,14 @@ import jwt as pyjwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import FastAPI, WebSocket
+from fastapi import Depends, FastAPI, WebSocket
 from fastapi.testclient import TestClient
 from flask import Flask
 from jwt.algorithms import RSAAlgorithm
 from starlette.websockets import WebSocketDisconnect
 
 from iap_portal.auth import core, jwks
+from iap_portal.auth import fastapi as fastapi_auth
 from iap_portal.auth.core import AuthError, InvalidToken, TokenExpired, current_user, user_from_request, verify_jwt
 from iap_portal.auth.fastapi import protect
 from iap_portal.auth.flask import register_auth, require_user as flask_require_user
@@ -304,3 +305,27 @@ def test_streamlit_reruns_survive_token_expiry_within_connection_age(fake_stream
         helper.require_user()
     assert "Sign-in required" in rendered[-1]
     assert core.max_connection_age() == 600
+
+
+@pytest.mark.parametrize("middleware", [True, False])
+@pytest.mark.parametrize("accept", ["application/json", "text/html"])
+def test_fastapi_auth_errors_do_not_expose_internal_details(monkeypatch, middleware, accept):
+    def failed_auth(headers):
+        raise AuthError("private-key-path/internal-jwks-error")
+
+    monkeypatch.setattr(fastapi_auth, "user_from_request", failed_auth)
+    app = FastAPI()
+    if middleware:
+        protect(app)
+    else:
+        fastapi_auth.install_unauthorized_handler(app)
+
+    @app.get("/", dependencies=[] if middleware else [Depends(fastapi_auth.require_user)])
+    def index():
+        return {"ok": True}
+
+    response = TestClient(app).get("/", headers={"accept": accept})
+    assert response.status_code == 401
+    assert "private-key-path" not in response.text
+    assert "internal-jwks-error" not in response.text
+    assert "unauthenticated" in response.text

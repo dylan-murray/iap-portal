@@ -16,6 +16,7 @@ import os
 import secrets
 import time
 from dataclasses import dataclass
+from html import escape
 from urllib.parse import urlencode
 
 import jwt
@@ -27,6 +28,19 @@ from jwt.algorithms import RSAAlgorithm
 
 ISSUER = os.environ.get("MOCK_IDP_ISSUER", "http://localhost:8081")
 CLIENT_ID = "portal-local"
+REDIRECT_URIS = tuple(uri.strip() for uri in os.environ.get(
+    "MOCK_IDP_REDIRECT_URIS",
+    "http://localhost:8088/auth/callback/oidc,"
+    "http://portal.iapportal.test:8090/auth/callback/oidc,"
+    "http://portal.iapportal.test/auth/callback/oidc",
+).split(",") if uri.strip())
+
+
+def registered_redirect(value: str) -> str:
+    for allowed in REDIRECT_URIS:
+        if value == allowed:
+            return allowed
+    raise HTTPException(400, "unregistered redirect_uri")
 
 USERS = {
     "alice": {"sub": "u-alice", "email": "alice@example.com", "name": "Alice"},
@@ -89,13 +103,14 @@ def authorize(
 ):
     if client_id != CLIENT_ID:
         raise HTTPException(400, f"unknown client_id {client_id}")
+    redirect_uri = registered_redirect(redirect_uri)
     buttons = "".join(
         f"""<form method="POST" action="/authorize/choose" style="display:inline">
             <input type="hidden" name="username" value="{u}">
-            <input type="hidden" name="redirect_uri" value="{redirect_uri}">
-            <input type="hidden" name="state" value="{state}">
-            <input type="hidden" name="nonce" value="{nonce}">
-            <input type="hidden" name="code_challenge" value="{code_challenge or ''}">
+            <input type="hidden" name="redirect_uri" value="{escape(redirect_uri, quote=True)}">
+            <input type="hidden" name="state" value="{escape(state, quote=True)}">
+            <input type="hidden" name="nonce" value="{escape(nonce, quote=True)}">
+            <input type="hidden" name="code_challenge" value="{escape(code_challenge or '', quote=True)}">
             <button type="submit"
                     style="padding:10px 20px;margin:6px;background:#0a7;color:#fff;
                            border:0;border-radius:6px;cursor:pointer;font-size:16px">
@@ -123,6 +138,7 @@ def authorize_choose(
 ):
     if username not in USERS:
         raise HTTPException(400, "unknown user")
+    redirect_uri = registered_redirect(redirect_uri)
     code = secrets.token_urlsafe(32)
     _CODES[code] = PendingAuth(
         username=username,
