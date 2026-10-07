@@ -84,7 +84,7 @@ async function remove(name: string) {
             v-model="newName"
             type="text"
             placeholder="engineering"
-            class="rounded-lg bg-white/5 border px-3 py-2 text-sm text-slate-100 font-mono placeholder-slate-600 focus:outline-none transition"
+            class="rounded-lg bg-white/5 border px-3 py-2 text-sm text-slate-100 font-mono placeholder-slate-600 focus:outline-hidden transition"
             :class="
               nameValid
                 ? 'border-white/10 focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30'
@@ -95,7 +95,7 @@ async function remove(name: string) {
             v-model="newDescription"
             type="text"
             placeholder="Description (optional)"
-            class="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+            class="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
           />
         </div>
         <div v-if="!nameValid" class="text-xs text-red-400">
@@ -129,7 +129,7 @@ async function remove(name: string) {
         <li
           v-for="g in groups"
           :key="g.id"
-          class="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition"
+          class="flex items-center justify-between px-5 py-3 hover:bg-white/2 transition"
         >
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">

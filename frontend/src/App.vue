@@ -88,7 +88,7 @@ router.afterEach(() => {
           </RouterLink>
           <div class="hidden sm:flex items-center gap-2 text-sm">
             <span
-              class="w-6 h-6 rounded-full bg-gradient-to-br from-fuchsia-500 to-cyan-500 flex items-center justify-center text-[10px] font-semibold text-white uppercase"
+              class="w-6 h-6 rounded-full bg-linear-to-br from-fuchsia-500 to-cyan-500 flex items-center justify-center text-[10px] font-semibold text-white uppercase"
             >
               {{ (userStore.user.name || userStore.user.email).slice(0, 1) }}
             </span>
@@ -97,7 +97,7 @@ router.afterEach(() => {
             </span>
             <span
               v-if="userStore.user.is_admin"
-              class="rounded px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-300 ring-1 ring-fuchsia-500/30"
+              class="rounded-sm px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-300 ring-1 ring-fuchsia-500/30"
             >
               admin
             </span>

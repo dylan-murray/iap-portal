@@ -148,7 +148,7 @@ const hasAny = computed(() => pending.value.length > 0);
             :value="durationByRequest[r.id] ?? 0"
             @change="durationByRequest[r.id] = Number(($event.target as HTMLSelectElement).value)"
             title="Grant duration"
-            class="rounded-md bg-white/5 border border-white/10 px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition"
+            class="rounded-md bg-white/5 border border-white/10 px-2.5 py-1.5 text-xs text-slate-100 focus:outline-hidden focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition"
           >
             <option v-for="opt in durationOptions" :key="opt.hours" :value="opt.hours">
               {{ opt.label }}

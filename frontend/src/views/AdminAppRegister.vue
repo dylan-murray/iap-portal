@@ -144,7 +144,7 @@ async function submit() {
               v-model="slug"
               type="text"
               placeholder="my-app"
-              class="w-full rounded-lg bg-white/5 border px-3 py-2 text-sm text-slate-100 font-mono placeholder-slate-600 focus:outline-none transition"
+              class="w-full rounded-lg bg-white/5 border px-3 py-2 text-sm text-slate-100 font-mono placeholder-slate-600 focus:outline-hidden transition"
               :class="
                 slugValid
                   ? 'border-white/10 focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30'
@@ -162,7 +162,7 @@ async function submit() {
               v-model="displayName"
               type="text"
               placeholder="My App"
-              class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+              class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
             />
           </div>
 
@@ -174,7 +174,7 @@ async function submit() {
               v-model="description"
               rows="2"
               placeholder="What does this app do?"
-              class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition resize-none"
+              class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition resize-none"
             />
           </div>
 
@@ -186,7 +186,7 @@ async function submit() {
               v-model="iconUrl"
               type="url"
               placeholder="https://..."
-              class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+              class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
             />
           </div>
         </div>
@@ -203,7 +203,7 @@ async function submit() {
               v-model="upstreamService"
               type="text"
               placeholder="my-app.iap-app-my-app.svc.cluster.local"
-              class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+              class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
             />
           </div>
           <div>
@@ -211,7 +211,7 @@ async function submit() {
             <input
               v-model.number="upstreamPort"
               type="number"
-              class="w-24 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+              class="w-24 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
             />
           </div>
         </div>
@@ -220,7 +220,7 @@ async function submit() {
           <input
             v-model="healthCheckPath"
             type="text"
-            class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+            class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 font-mono focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
           />
         </div>
       </div>
@@ -236,7 +236,7 @@ async function submit() {
           v-model="ownersRaw"
           type="text"
           placeholder="alice@example.com, bob@example.com"
-          class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+          class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
         />
         <p class="mt-2 text-xs text-slate-500">
           You'll be added as an owner automatically.

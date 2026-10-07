@@ -129,7 +129,7 @@ async function removeMember(email: string) {
           v-model="newMember"
           type="email"
           placeholder="user@example.com"
-          class="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+          class="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
         />
         <button
           type="submit"
