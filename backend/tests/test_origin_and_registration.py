@@ -194,7 +194,7 @@ async def test_failed_bearer_attempts_are_rate_limited(client, settings):
 async def test_sign_in_is_rate_limited_per_client(client, settings):
     settings.set(rate_limit_login_per_minute=2)
     codes = [
-        (await client.get("/login/okta", headers={"x-forwarded-for": "203.0.113.5"})).status_code
+        (await client.get("/login/oidc", headers={"x-forwarded-for": "203.0.113.5"})).status_code
         for _ in range(3)
     ]
     assert codes[-1] == 429

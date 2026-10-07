@@ -55,9 +55,28 @@ class Settings(BaseSettings):
     app_session_ttl_seconds: int = 60 * 60 * 12
     app_login_code_ttl_seconds: int = 60
 
-    okta_issuer: str = ""
-    okta_client_id: str = ""
-    okta_client_secret: str = ""
+    oidc_display_name: str = Field(default="SSO", min_length=1, max_length=100)
+    oidc_scopes: list[str] = Field(default_factory=lambda: ["openid", "email", "profile"])
+    oidc_token_endpoint_auth_method: Literal["client_secret_basic", "client_secret_post"] = "client_secret_basic"
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+
+    @field_validator("oidc_display_name")
+    @classmethod
+    def _oidc_display_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("OIDC display name must not be blank")
+        return value.strip()
+
+    @field_validator("oidc_scopes")
+    @classmethod
+    def _oidc_scopes(cls, value: list[str]) -> list[str]:
+        if "openid" not in value:
+            raise ValueError("OIDC scopes must include openid")
+        if any(not scope or any(c.isspace() for c in scope) for scope in value):
+            raise ValueError("OIDC scopes must be individual non-empty scope names")
+        return list(dict.fromkeys(value))
 
     google_client_id: str = ""
     google_client_secret: str = ""
@@ -67,7 +86,7 @@ class Settings(BaseSettings):
     # Google Workspace domains required in the `hd` claim for Google sign-in.
     google_hosted_domains: list[str] = Field(default_factory=list)
     # Link a verified email to an existing account whose identities all come from a
-    # different issuer (e.g. Okta and Google Workspace for the same company).
+    # different issuer (e.g. OIDC and Google Workspace for the same company).
     # Accounts are never re-linked to a different subject from the same issuer.
     link_verified_email_across_issuers: bool = False
 

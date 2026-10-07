@@ -56,7 +56,7 @@ async def test_legacy_database_is_adopted_and_data_preserved(tmp_path):
     assert await _diff(engine) == []
     async with engine.connect() as conn:
         identity = (await conn.execute(text("SELECT provider, subject, issuer FROM user_identities"))).one()
-        assert tuple(identity) == ("okta", "u1", None)
+        assert tuple(identity) == ("oidc", "u1", None)
         assert (await conn.execute(text("SELECT count(*) FROM app_access"))).scalar_one() == 1
         version = (await conn.execute(text("SELECT version_num FROM alembic_version"))).scalar_one()
         assert version == head_revision()
@@ -80,4 +80,37 @@ async def test_startup_refuses_outdated_schema_when_auto_migrate_is_off(tmp_path
     await migrate(engine, "0001")
     with pytest.raises(SchemaError):
         await assert_current(engine)
+    await engine.dispose()
+
+
+async def test_oidc_migration_preserves_identities_and_sessions(tmp_path):
+    engine = await _engine(tmp_path)
+    await migrate(engine, '0002')
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            "INSERT INTO users (id, email, is_admin, created_at) VALUES (1, 'a@example.com', 0, CURRENT_TIMESTAMP)"
+        ))
+        for provider in ('okta', 'google'):
+            await conn.execute(text(
+                "INSERT INTO user_identities (user_id, provider, subject, issuer, raw_claims) "
+                "VALUES (1, :provider, 'subject', :issuer, '{}')"
+            ), {'provider': provider, 'issuer': f'https://{provider}.example.test'})
+            await conn.execute(text(
+                "INSERT INTO auth_sessions (token_hash, kind, user_id, provider, expires_at) "
+                "VALUES (:provider, 'portal', 1, :provider, '2030-01-01')"
+            ), {'provider': provider})
+    await migrate(engine)
+    await migrate(engine)
+    async with engine.connect() as conn:
+        identities = (await conn.execute(text(
+            'SELECT user_id, provider, subject, issuer FROM user_identities ORDER BY provider'
+        ))).all()
+        assert [tuple(row) for row in identities] == [
+            (1, 'google', 'subject', 'https://google.example.test'),
+            (1, 'oidc', 'subject', 'https://okta.example.test'),
+        ]
+        sessions = (await conn.execute(text(
+            'SELECT user_id, token_hash, provider FROM auth_sessions ORDER BY provider'
+        ))).all()
+        assert [tuple(row) for row in sessions] == [(1, 'google', 'google'), (1, 'okta', 'oidc')]
     await engine.dispose()

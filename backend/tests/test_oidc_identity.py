@@ -17,18 +17,18 @@ from iap_portal_server.config import get_settings
 from iap_portal_server.db.models import IdentityProvider, User, UserIdentity
 from tests.conftest import OPERATOR_TOKEN, PORTAL, make_user
 
-OKTA = "https://tenant.okta.example.com/oauth2/default"
+OIDC = "https://idp.example.com"
 GOOGLE = "https://accounts.google.com"
 
 
 def _claims(sub="u1", email="alice@example.com", verified=True, **extra):
-    claims = {"iss": OKTA, "sub": sub, "email": email, "name": "Alice", **extra}
+    claims = {"iss": OIDC, "sub": sub, "email": email, "name": "Alice", **extra}
     if verified is not None:
         claims["email_verified"] = verified
     return claims
 
 
-async def _login(db, provider="okta", issuer=OKTA, **kw):
+async def _login(db, provider="oidc", issuer=OIDC, **kw):
     settings = get_settings()
     claims = verified_claims(provider, issuer, _claims(**kw), settings)
     user, how = await resolve_user(db, claims, settings)
@@ -42,21 +42,21 @@ async def _login(db, provider="okta", issuer=OKTA, **kw):
 @pytest.mark.parametrize("verified", [None, False, "false", "yes"])
 def test_unverified_or_missing_email_verified_is_rejected(verified):
     with pytest.raises(LoginRejected) as err:
-        verified_claims("okta", OKTA, _claims(verified=verified), get_settings())
+        verified_claims("oidc", OIDC, _claims(verified=verified), get_settings())
     assert err.value.reason == "email_unverified"
 
 
 def test_missing_subject_or_email_is_rejected():
     for claims in ({"email": "a@example.com", "email_verified": True}, {"sub": "u1", "email_verified": True}):
         with pytest.raises(LoginRejected):
-            verified_claims("okta", OKTA, claims, get_settings())
+            verified_claims("oidc", OIDC, claims, get_settings())
 
 
 def test_admission_by_email_domain_and_google_hosted_domain(settings):
     settings.set(allowed_email_domains=["example.com"])
-    verified_claims("okta", OKTA, _claims(), get_settings())
+    verified_claims("oidc", OIDC, _claims(), get_settings())
     with pytest.raises(LoginRejected):
-        verified_claims("okta", OKTA, _claims(email="x@partner.example.org"), get_settings())
+        verified_claims("oidc", OIDC, _claims(email="x@partner.example.org"), get_settings())
 
     settings.set(allowed_email_domains=[], google_hosted_domains=["example.com"])
     verified_claims("google", GOOGLE, _claims(hd="example.com"), get_settings())
@@ -110,12 +110,12 @@ async def test_email_change_cannot_take_over_another_account(db):
 
 async def test_legacy_identity_without_issuer_is_upgraded(db):
     user = await make_user(db, "alice@example.com")
-    db.add(UserIdentity(user_id=user.id, provider=IdentityProvider.OKTA, issuer=None, subject="u1", raw_claims={}))
+    db.add(UserIdentity(user_id=user.id, provider=IdentityProvider.OIDC, issuer=None, subject="u1", raw_claims={}))
     await db.commit()
     again, how = await _login(db)
     assert how == "existing" and again.id == user.id
     identity = (await db.execute(select(UserIdentity))).scalar_one()
-    assert identity.issuer == OKTA
+    assert identity.issuer == OIDC
 
 
 async def test_admin_unlink_allows_deliberate_relink(client, db):
@@ -132,28 +132,30 @@ async def test_admin_unlink_allows_deliberate_relink(client, db):
 
 
 class _FakeClient:
-    def __init__(self, token):
+    def __init__(self, token, issuer):
         self._token = token
+        self._issuer = issuer
 
     async def authorize_access_token(self, request):
         return self._token
 
     async def load_server_metadata(self):
-        return {"issuer": GOOGLE}
+        return {"issuer": self._issuer}
 
 
 def _unsigned_id_token(claims):
     return pyjwt.encode(claims, key="", algorithm="none")
 
 
-@pytest.fixture
-def fake_google(monkeypatch):
-    holder = {}
+@pytest.fixture(params=["google", "oidc"])
+def fake_google(monkeypatch, request):
+    holder = {"provider": request.param, "issuer": GOOGLE if request.param == "google" else OIDC}
 
     class _OAuth:
-        @property
-        def google(self):
-            return _FakeClient(holder["token"])
+        def __getattr__(self, name):
+            if name == holder["provider"]:
+                return _FakeClient(holder["token"], holder["issuer"])
+            raise AttributeError(name)
 
     monkeypatch.setattr(login_api, "oauth", lambda: _OAuth())
     return holder
@@ -162,7 +164,7 @@ def fake_google(monkeypatch):
 async def test_callback_never_decodes_unverified_id_token(client, db, fake_google):
     forged = {"iss": GOOGLE, "sub": "x", "email": "admin@example.com", "email_verified": True}
     fake_google["token"] = {"id_token": _unsigned_id_token(forged)}  # no validated userinfo
-    resp = await client.get("/auth/callback/google")
+    resp = await client.get(f"/auth/callback/{fake_google['provider']}")
     assert resp.status_code == 400
     assert portal_cookie_name() not in resp.headers.get("set-cookie", "")
     assert (await db.execute(select(func.count()).select_from(User))).scalar_one() == 0
@@ -170,25 +172,25 @@ async def test_callback_never_decodes_unverified_id_token(client, db, fake_googl
 
 async def test_callback_rejects_issuer_mismatch(client, fake_google):
     fake_google["token"] = {"userinfo": {**_claims(), "iss": "https://evil.example.com"}}
-    assert (await client.get("/auth/callback/google")).status_code == 400
+    assert (await client.get(f"/auth/callback/{fake_google['provider']}")).status_code == 400
 
 
 async def test_callback_signs_in_with_validated_claims(client, db, fake_google):
-    fake_google["token"] = {"userinfo": {**_claims(sub="g-7"), "iss": GOOGLE}}
-    resp = await client.get("/auth/callback/google")
+    fake_google["token"] = {"userinfo": {**_claims(sub="g-7"), "iss": fake_google["issuer"]}}
+    resp = await client.get(f"/auth/callback/{fake_google['provider']}")
     assert resp.status_code == 302 and resp.headers["location"] == PORTAL + "/"
     assert portal_cookie_name() in resp.headers["set-cookie"]
     identity = (await db.execute(select(UserIdentity))).scalar_one()
-    assert (identity.issuer, identity.subject) == (GOOGLE, "g-7")
+    assert (identity.issuer, identity.subject) == (fake_google["issuer"], "g-7")
 
 
 async def test_callback_rejects_disabled_users(client, db, fake_google):
-    fake_google["token"] = {"userinfo": {**_claims(sub="g-7"), "iss": GOOGLE}}
-    await client.get("/auth/callback/google")
+    fake_google["token"] = {"userinfo": {**_claims(sub="g-7"), "iss": fake_google["issuer"]}}
+    await client.get(f"/auth/callback/{fake_google['provider']}")
     user = (await db.execute(select(User))).scalar_one()
     user.disabled_at = utcnow()
     await db.commit()
-    resp = await client.get("/auth/callback/google")
+    resp = await client.get(f"/auth/callback/{fake_google['provider']}")
     assert resp.status_code == 403
 
 

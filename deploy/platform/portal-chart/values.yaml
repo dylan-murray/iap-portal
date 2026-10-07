@@ -13,9 +13,12 @@ portal:
   adminEmails: ""
   # Enable one or both providers explicitly; production needs at least one.
   auth:
-    okta:
+    oidc:
       enabled: false
-      issuer: "" # https://YOUR_TENANT.okta.com/oauth2/default
+      displayName: SSO
+      scopes: [openid, email, profile]
+      tokenEndpointAuthMethod: client_secret_basic
+      issuer: "" # https://idp.example.com
       clientId: ""
       # Existing Secret in the portal namespace; may also be portal.existingSecret.
       clientSecretRef:

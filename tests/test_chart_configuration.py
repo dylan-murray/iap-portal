@@ -366,26 +366,26 @@ def test_portal_display_name_is_runtime_configuration():
     assert next(e['value'] for e in default['spec']['template']['spec']['containers'][0]['env'] if e['name'] == 'PORTAL_DISPLAY_NAME') == 'iap-portal'
 
 
-@pytest.mark.parametrize('okta,google', [(True, False), (False, True), (True, True), (False, False)])
-def test_portal_auth_provider_selection(okta, google):
+@pytest.mark.parametrize('oidc,google', [(True, False), (False, True), (True, True), (False, False)])
+def test_portal_auth_provider_selection(oidc, google):
     docs = render_portal(
-        '--set', f'portal.auth.okta.enabled={str(okta).lower()}',
+        '--set', f'portal.auth.oidc.enabled={str(oidc).lower()}',
         '--set', f'portal.auth.google.enabled={str(google).lower()}',
-        '--set', 'portal.auth.okta.issuer=https://company.okta.com/oauth2/default',
-        '--set', 'portal.auth.okta.clientId=okta-client',
+        '--set', 'portal.auth.oidc.issuer=https://idp.example.com',
+        '--set', 'portal.auth.oidc.clientId=oidc-client',
         '--set', 'portal.auth.google.clientId=google-client',
-        '--set', 'portal.auth.okta.clientSecretRef.name=okta-oauth',
-        '--set', 'portal.auth.okta.clientSecretRef.key=okta-secret',
+        '--set', 'portal.auth.oidc.clientSecretRef.name=oidc-oauth',
+        '--set', 'portal.auth.oidc.clientSecretRef.key=oidc-secret',
         '--set', 'portal.auth.google.clientSecretRef.name=google-oauth',
         '--set', 'portal.auth.google.clientSecretRef.key=google-secret',
     )
     for container in one(docs, 'Deployment')['spec']['template']['spec']['containers']:
         env = {item['name']: item.get('value') for item in container['env']}
-        assert env['PORTAL_OKTA_ISSUER'] == ('https://company.okta.com/oauth2/default' if okta else '')
-        assert env['PORTAL_OKTA_CLIENT_ID'] == ('okta-client' if okta else '')
+        assert env['PORTAL_OIDC_ISSUER'] == ('https://idp.example.com' if oidc else '')
+        assert env['PORTAL_OIDC_CLIENT_ID'] == ('oidc-client' if oidc else '')
         assert env['PORTAL_GOOGLE_CLIENT_ID'] == ('google-client' if google else '')
         entries = {item['name']: item for item in container['env']}
-        for provider, enabled in [('okta', okta), ('google', google)]:
+        for provider, enabled in [('oidc', oidc), ('google', google)]:
             entry = entries[f'PORTAL_{provider.upper()}_CLIENT_SECRET']
             if enabled:
                 assert entry['valueFrom'] == {'secretKeyRef': {'name': f'{provider}-oauth', 'key': f'{provider}-secret'}}
@@ -395,7 +395,7 @@ def test_portal_auth_provider_selection(okta, google):
                 assert 'valueFrom' not in entry
 
 
-@pytest.mark.parametrize('provider', ['okta', 'google'])
+@pytest.mark.parametrize('provider', ['oidc', 'google'])
 def test_enabled_provider_requires_configuration(provider):
     result = subprocess.run([
         'helm', 'template', 'portal', str(PLATFORM / 'portal-chart'),
@@ -406,14 +406,14 @@ def test_enabled_provider_requires_configuration(provider):
     assert f'is required when {provider} is enabled' in result.stderr
 
 
-@pytest.mark.parametrize('provider', ['okta', 'google'])
+@pytest.mark.parametrize('provider', ['oidc', 'google'])
 @pytest.mark.parametrize('missing', ['name', 'key'])
 def test_oauth_secret_reference_is_required(provider, missing):
     result = subprocess.run([
         'helm', 'template', 'portal', str(PLATFORM / 'portal-chart'),
         '--set', 'image.repository=example/portal',
         '--set', f'portal.auth.{provider}.enabled=true',
-        '--set', 'portal.auth.okta.issuer=https://company.okta.com/oauth2/default',
+        '--set', 'portal.auth.oidc.issuer=https://idp.example.com',
         '--set', f'portal.auth.{provider}.clientId=fixture',
         '--set', f'portal.auth.{provider}.clientSecretRef.name=oauth-credentials',
         '--set', f'portal.auth.{provider}.clientSecretRef.key=client-secret',
@@ -432,3 +432,29 @@ def test_app_slug_fits_prefixed_namespace(length, valid):
     assert (result.returncode == 0) == valid
     if valid:
         assert len(one(_docs(result.stdout), 'Deployment')['metadata']['namespace']) == 63
+
+
+def test_generic_oidc_options_reach_both_listeners():
+    docs = render_portal(
+        '--set-string', 'portal.auth.oidc.displayName=Company SSO',
+        '--set-json', 'portal.auth.oidc.scopes=["openid","email","profile","custom"]',
+        '--set', 'portal.auth.oidc.tokenEndpointAuthMethod=client_secret_post',
+    )
+    for container in one(docs, 'Deployment')['spec']['template']['spec']['containers']:
+        env = {item['name']: item.get('value') for item in container['env']}
+        assert env['PORTAL_OIDC_DISPLAY_NAME'] == 'Company SSO'
+        assert env['PORTAL_OIDC_SCOPES'] == '["openid","email","profile","custom"]'
+        assert env['PORTAL_OIDC_TOKEN_ENDPOINT_AUTH_METHOD'] == 'client_secret_post'
+
+
+@pytest.mark.parametrize('setting', [
+    'portal.auth.okta.enabled=true',
+    'portal.auth.oidc.scopes=["email"]',
+    'portal.auth.oidc.tokenEndpointAuthMethod="none"',
+])
+def test_chart_rejects_obsolete_or_invalid_oidc_options(setting):
+    result = subprocess.run([
+        'helm', 'template', 'portal', str(PLATFORM / 'portal-chart'),
+        '--set', 'image.repository=example/portal', '--set-json', setting,
+    ], capture_output=True, text=True)
+    assert result.returncode != 0

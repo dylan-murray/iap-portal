@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 250" role="img" aria-label="From sign-in to an internal app in four steps">
+<rect width="1200" height="250" rx="18" fill="#0d1117"/>
+<g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">
+<rect x="24" y="24" width="264" height="202" rx="12" fill="#161b22" stroke="#30363d"/>
+<circle cx="56" cy="60" r="16" fill="#c084fc"/>
+<text x="56" y="66" text-anchor="middle" fill="#0d1117" font-size="18" font-weight="700">1</text>
+<text x="44" y="113" fill="#f0f6fc" font-size="25" font-weight="600">Sign in</text>
+<text x="44" y="151" fill="#b1bac4" font-size="17">Use your company account</text>
+<text x="44" y="177" fill="#b1bac4" font-size="17">with OIDC or Google.</text>
+<path d="M295 125h18m-6-6 6 6-6 6" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="320" y="24" width="264" height="202" rx="12" fill="#161b22" stroke="#30363d"/>
+<circle cx="352" cy="60" r="16" fill="#c084fc"/>
+<text x="352" y="66" text-anchor="middle" fill="#0d1117" font-size="18" font-weight="700">2</text>
+<text x="340" y="113" fill="#f0f6fc" font-size="25" font-weight="600">Choose an app</text>
+<text x="340" y="151" fill="#b1bac4" font-size="17">Find your internal tools</text>
+<text x="340" y="177" fill="#b1bac4" font-size="17">in the portal.</text>
+<path d="M591 125h18m-6-6 6 6-6 6" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="616" y="24" width="264" height="202" rx="12" fill="#161b22" stroke="#30363d"/>
+<circle cx="648" cy="60" r="16" fill="#c084fc"/>
+<text x="648" y="66" text-anchor="middle" fill="#0d1117" font-size="18" font-weight="700">3</text>
+<text x="636" y="113" fill="#f0f6fc" font-size="25" font-weight="600">Check access</text>
+<text x="636" y="151" fill="#b1bac4" font-size="17">The gateway asks the portal</text>
+<text x="636" y="177" fill="#b1bac4" font-size="17">whether you have access.</text>
+<path d="M887 125h18m-6-6 6 6-6 6" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="912" y="24" width="264" height="202" rx="12" fill="#161b22" stroke="#30363d"/>
+<circle cx="944" cy="60" r="16" fill="#c084fc"/>
+<text x="944" y="66" text-anchor="middle" fill="#0d1117" font-size="18" font-weight="700">4</text>
+<text x="932" y="113" fill="#f0f6fc" font-size="25" font-weight="600">Open the app</text>
+<text x="932" y="151" fill="#b1bac4" font-size="17">Allowed requests reach</text>
+<text x="932" y="177" fill="#b1bac4" font-size="17">the app with your identity.</text>
+</g></svg>

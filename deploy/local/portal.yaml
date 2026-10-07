@@ -117,9 +117,9 @@ spec:
             - { name: PORTAL_PORTAL_BASE_URL, value: "http://portal.iapportal.test" }
             - { name: PORTAL_KUBERNETES_REGISTRATION_ENABLED, value: "true" }
             - { name: PORTAL_DATABASE_URL,    value: "postgresql+asyncpg://portal:portal@postgres/portal" }
-            - { name: PORTAL_OKTA_ISSUER,     value: "http://mock-idp.iapportal.test" }
-            - { name: PORTAL_OKTA_CLIENT_ID,  value: "portal-local" }
-            - { name: PORTAL_OKTA_CLIENT_SECRET, value: "secret" }
+            - { name: PORTAL_OIDC_ISSUER,     value: "http://mock-idp.iapportal.test" }
+            - { name: PORTAL_OIDC_CLIENT_ID,  value: "portal-local" }
+            - { name: PORTAL_OIDC_CLIENT_SECRET, value: "secret" }
             - { name: PORTAL_ADMIN_EMAILS, value: "alice@example.com" }
             - { name: PORTAL_JWT_KID,         value: "dev-v1" }
             - name: PORTAL_SESSION_SECRET
@@ -150,9 +150,9 @@ spec:
             - { name: PORTAL_PORTAL_BASE_URL, value: "http://portal.iapportal.test" }
             - { name: PORTAL_KUBERNETES_REGISTRATION_ENABLED, value: "true" }
             - { name: PORTAL_DATABASE_URL,    value: "postgresql+asyncpg://portal:portal@postgres/portal" }
-            - { name: PORTAL_OKTA_ISSUER,     value: "http://mock-idp.iapportal.test" }
-            - { name: PORTAL_OKTA_CLIENT_ID,  value: "portal-local" }
-            - { name: PORTAL_OKTA_CLIENT_SECRET, value: "secret" }
+            - { name: PORTAL_OIDC_ISSUER,     value: "http://mock-idp.iapportal.test" }
+            - { name: PORTAL_OIDC_CLIENT_ID,  value: "portal-local" }
+            - { name: PORTAL_OIDC_CLIENT_SECRET, value: "secret" }
             - { name: PORTAL_ADMIN_EMAILS, value: "alice@example.com" }
             - { name: PORTAL_JWT_KID,         value: "dev-v1" }
             - name: PORTAL_SESSION_SECRET

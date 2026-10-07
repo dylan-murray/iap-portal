@@ -30,7 +30,7 @@ os.environ.update(
         "PORTAL_JWT_PRIVATE_KEY_PEM": _priv_pem,
         "PORTAL_JWT_PUBLIC_KEY_PEM": _pub_pem,
         "PORTAL_JWT_KID": "test-kid",
-        "PORTAL_OKTA_ISSUER": "",
+        "PORTAL_OIDC_ISSUER": "",
         "PORTAL_GOOGLE_CLIENT_ID": "test-google-client",
         "PORTAL_ADMIN_EMAILS": "admin@example.com",
         "PORTAL_ADMIN_API_TOKEN": "operator-token-0123456789abcdef0123456789",
@@ -149,7 +149,7 @@ async def make_app(db, slug: str, *, enabled: bool = True, owner: User | None = 
 
 async def portal_session(db, user: User):
     """(cookie header, session row) for a portal session."""
-    token, row = await create_portal_session(db, user, "okta")
+    token, row = await create_portal_session(db, user, "oidc")
     await db.commit()
     return f"{portal_cookie_name()}={token}", row
 

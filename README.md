@@ -1,11 +1,11 @@
-<h4 align="center">
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-dark.svg">
     <img src="assets/wordmark-light.svg" alt="iap-portal" width="300">
   </picture>
-  <br>
-  One home for your internal apps
-</h4>
+</p>
+
+<h3 align="center">Access control for AI-built internal tools</h3>
 
 <p align="center">
   <a href="https://github.com/dylan-murray/iap-portal/actions/workflows/portal-ci.yml"><img src="https://github.com/dylan-murray/iap-portal/actions/workflows/portal-ci.yml/badge.svg" alt="CI"></a>
@@ -15,13 +15,12 @@
 
 <h2></h2>
 
-iap-portal gives your team one place to find and use internal apps. Ship a Streamlit
-tool, a Gradio demo, a FastAPI service, or a custom web app. The gateway handles
-sign-in and app access; owners manage who can use their tools from the portal.
+AI makes it easy to build internal tools. iap-portal gives your team a way to
+share them with sign-in and access controls built in. Ship a Streamlit tool, a
+Gradio demo, a FastAPI service, or a custom web app. The gateway checks access.
+App owners decide who can use their tools from the portal.
 
-<img src="assets/portal-demo.png" alt="IAP Portal dashboard showing the bundled FastAPI SSE and Streamlit apps, signed in as the mock user Alice">
-
-*Local demo with the bundled apps and mock identities.*
+<img src="assets/portal-demo.gif" alt="IAP Portal demo: browse apps, approve an access request, grant time-limited access, and launch an interactive Streamlit app">
 
 ## 💡 Why iap-portal
 
@@ -31,7 +30,7 @@ provides those pieces once, so each app can use the same deployment and access m
 
 - **A home for your tools.** A shared app catalog with owner-managed access
   requests, user and group grants, and expiration.
-- **Sign-in at the gateway.** Configure Okta, Google, or both. Istio checks access
+- **Sign-in at the gateway.** Configure your OIDC provider, Google, or both. Istio checks access
   before forwarding traffic to an app.
 - **Apps as code.** An `iap-app.yaml` file describes the image, route, owners, and
   runtime settings. Deploy with Helm or use the reusable GitHub Actions workflow.
@@ -66,56 +65,45 @@ uv run iap-portal apply examples/fastapi-sse/iap-app.yaml
 ```
 
 Open [the local portal](http://portal.iapportal.test:8090), choose **Continue with
-Okta**, and sign in as **alice**. This uses the mock identity provider; no real
+SSO**, and sign in as **alice**. This uses the mock identity provider. No real
 OAuth credentials are needed. The example owner is `alice@example.com`.
 
-To try the Kubernetes deployment locally, follow the [Minikube guide](deploy/local/README.md).
 For native hot reload and SDK development, see [Local development](docs/LOCAL_DEV.md).
 
 ## ☸️ Deploy to Kubernetes
 
 Bring Kubernetes 1.30+, a compatible Istio installation with Gateway API support,
-a NetworkPolicy-capable CNI, wildcard DNS/TLS, Postgres, and an Okta or Google OAuth
+a NetworkPolicy-capable CNI, wildcard DNS/TLS, Postgres, and an OIDC or Google
 application. The supplied namespace configuration uses Istio ambient mode.
 
-Generate matching platform manifests and Helm values:
-
-```bash
-uv run python scripts/configure-platform.py \
-  --domain apps.example.com \
-  --image YOUR_REGISTRY/iap-portal \
-  --tag 0.1.0 \
-  --display-name "Company Apps" \
-  --output .internal/company-install
-
-task package:charts
-```
-
 Follow [Platform installation](deploy/platform/README.md) to build the portal image,
-configure Secrets, apply the Istio and gateway resources, and install the charts.
-The generator writes files; it does not modify your cluster.
+configure Secrets, connect Istio, and install the Helm charts. The guide includes
+an optional helper for generating matching domain and gateway settings.
 
 The `iap-portal` chart installs the portal. The `iap-app` chart deploys each app
 with routing, isolation, and registration. Postgres, DNS, certificates, and Istio
-are supplied separately. Images and charts currently build from this checkout;
-public registry releases are not yet available.
+are supplied separately. Images and charts currently build from this checkout.
+Public registry releases are not yet available.
 
 ## 🔐 Choose your sign-in providers
 
-Configure either provider or both. Client IDs and issuer settings live in values;
-client secrets come from existing Kubernetes Secrets:
+Use an OIDC provider such as Okta, or Google, or both. The OIDC button label and
+scopes are configurable. Client IDs and issuer settings live in values.
+Client secrets come from existing Kubernetes Secrets:
 
 ```yaml
 portal:
   displayName: Company Apps
   auth:
-    okta:
+    oidc:
       enabled: true
-      issuer: https://YOUR_TENANT.okta.com/oauth2/default
-      clientId: YOUR_OKTA_CLIENT_ID
+      displayName: Company SSO
+      scopes: [openid, email, profile]
+      issuer: https://idp.example.com
+      clientId: YOUR_OIDC_CLIENT_ID
       clientSecretRef:
         name: portal-oauth
-        key: okta-client-secret
+        key: oidc-client-secret
     google:
       enabled: true
       clientId: YOUR_GOOGLE_CLIENT_ID
@@ -125,8 +113,8 @@ portal:
   allowedEmailDomains: [example.com]
 ```
 
-Set either provider's `enabled` to `false` to leave it out. Both default to disabled;
-production requires at least one. The login page shows only configured providers.
+Set either provider's `enabled` to `false` to leave it out. Both default to disabled.
+Production requires at least one. The login page shows only configured providers.
 See [provider setup](deploy/platform/README.md#install-the-portal) for redirect URIs,
 Secret requirements, and Google Workspace domain restrictions.
 
@@ -146,12 +134,12 @@ Replace `YOUR_ORG/iap-portal` with your platform repository. The scaffold includ
 an app, Dockerfile, deployment workflow, and `iap-app.yaml`:
 
 ```yaml
-slug: my-tool
 displayName: My tool
+slug: my-tool
+domain: apps.example.com
 framework: streamlit
 entrypoint: app.py
 port: 8080
-domain: apps.example.com
 image:
   repository: YOUR_REGISTRY/my-tool
   tag: "0.1.0"
@@ -159,26 +147,22 @@ registration:
   owners: [owner@example.com]
 ```
 
+The `slug` and `domain` form the app URL: `my-tool.apps.example.com`.
+
 Configure your registry and deployment credentials, prepare the app namespace,
 and deploy with Helm or GitHub Actions. The registration Job uses a projected
-ServiceAccount token; app namespaces do not need the portal's admin credential.
+ServiceAccount token. App namespaces do not need the portal's admin credential.
 See [Adding an app](docs/ADDING_AN_APP.md) for the complete walkthrough.
 
 ## ⚙️ How it works
 
-```text
-Browser → Istio gateway → application
-               │              ↑
-               │ access check │ app-scoped identity
-               ↓              │
-          IAP Portal ─────────┘
-          sign-in · grants · app catalog
-               │
-            Postgres
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-dark.svg">
+  <img src="assets/how-it-works-light.svg" alt="Four steps: sign in with OIDC or Google, choose an app in the portal, let the gateway check access with the portal, and open the app if allowed.">
+</picture>
 
 The gateway asks the portal whether the user may access the app. Each app gets
-its own session cookie and app-scoped token; it never receives the portal session.
+its own session cookie and app-scoped token. It never receives the portal session.
 The optional Python SDK verifies the signed token and exposes a typed user object.
 Apps remain responsible for permissions inside their own application.
 
@@ -188,7 +172,6 @@ implemented controls, and remaining validation gaps before deploying it for a te
 ## 📚 Go further
 
 - [Platform installation](deploy/platform/README.md) — Helm, Istio, domains, providers, and Secrets.
-- [Minikube](deploy/local/README.md) — the Kubernetes stack with mock authentication.
 - [Local development](docs/LOCAL_DEV.md) — Compose, hot reload, and SDK development.
 - [Adding an app](docs/ADDING_AN_APP.md) — scaffolding, images, registration, and deployment.
 - [Security](docs/SECURITY.md) — identity boundaries, access enforcement, and limitations.
@@ -196,28 +179,21 @@ implemented controls, and remaining validation gaps before deploying it for a te
 
 ## ❓ FAQ
 
-**Is this an identity provider?** No. Okta or Google authenticates the user.
+**Is this an identity provider?** No. OIDC or Google authenticates the user.
 iap-portal handles app discovery and app-level access, with Istio enforcing the
 access decision at the gateway.
 
 **Do I have to use Python?** No. Custom web apps can sit behind the gateway.
 The Python SDK and framework images are conveniences for Python applications.
 
-**Does it work without Kubernetes?** The repository includes a Docker Compose
-stack for local development. Kubernetes with Istio is the primary deployment;
-Compose is not currently documented as a production installation.
-
-**Where does the data live?** In the Postgres database you configure. It can run
-inside or outside the cluster. The portal chart does not provision it. The
-Minikube demo database is disposable and has no persistent volume.
-
-**Can I use it commercially?** Yes. The core is licensed under Apache 2.0, with
-no per-seat limit.
+**Does it work without Kubernetes?** Yes. Docker Compose runs the portal,
+Postgres, and an Envoy gateway without Kubernetes or Istio. The included setup is
+for local development. Kubernetes with Istio is the documented production path.
 
 ## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and contribution guidelines.
-Run `task test` for the backend, SDK, and chart tests; `task check:portability`
+Run `task test` for the backend, SDK, and chart tests. `task check:portability`
 checks distributable source, Helm charts, and Compose configuration.
 
 ## 📄 License

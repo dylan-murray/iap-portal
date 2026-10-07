@@ -76,7 +76,7 @@ def check_settings(s: Settings) -> ConfigReport:
             fatal.append(
                 f"PORTAL_ADMIN_API_TOKEN must be a random value of at least {MIN_SECRET_LENGTH} characters"
             )
-        if not (s.okta_issuer or s.google_client_id):
+        if not (s.oidc_issuer or s.google_client_id):
             fatal.append("at least one identity provider must be configured")
         fatal.extend(key_problems(s))
     else:

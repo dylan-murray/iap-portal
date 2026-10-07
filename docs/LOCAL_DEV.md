@@ -7,6 +7,10 @@ Compose stack. Both use development credentials and must remain local: they set
 `*.test` URLs. The identity-free `/dev/login` endpoint additionally requires
 `PORTAL_ENABLE_DEV_LOGIN=true`.
 
+To test the Helm charts and Istio routing on a local Kubernetes cluster, use
+the [Minikube walkthrough](../deploy/local/README.md). Use the workflows below
+for Compose, hot reload, and SDK development.
+
 If ports 8090, 8081, or 5433 are taken, set `IAP_PORTAL_GATEWAY_PORT`,
 `IAP_PORTAL_IDP_PORT`, and `IAP_PORTAL_DB_PORT` for `docker compose`, and browse to
 the portal on the gateway port you chose.
@@ -100,7 +104,7 @@ export IAP_PORTAL_SOURCE=/absolute/path/to/iap-portal
 iap-portal dev --full
 # → open http://my-tool.iapportal.test:8090
 # → gets 302 to http://portal.iapportal.test:8090/login
-# → click "Continue with Okta" → pick a test user from the mock IdP
+# → click "Continue with SSO" → pick a test user from the mock IdP
 # → redirected back with a real session cookie
 # → Envoy sub-requests /auth/verify on every request
 # → portal mints a real JWT with real kid, signed with the dev key

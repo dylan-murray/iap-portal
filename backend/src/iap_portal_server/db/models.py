@@ -10,7 +10,7 @@ class Base(DeclarativeBase):
 
 
 class IdentityProvider(str, Enum):
-    OKTA = "okta"
+    OIDC = "oidc"
     GOOGLE = "google"
 
 

@@ -1,6 +1,6 @@
 """Sign-in, sign-out, and app sign-in endpoints.
 
-Okta and Google are independent OIDC flows. Users are identified by
+The generic provider and Google have independent OIDC flows. Users are identified by
 (issuer, subject); see auth/identity.py for the linking rules.
 
 App sign-in: an app host without a valid app session is redirected by
@@ -63,12 +63,12 @@ async def login_page(request: Request, return_to: str = "/") -> HTMLResponse:
     return_to = validate_return_to(return_to)
     rt = escape(quote(return_to, safe=""), quote=True)
     buttons = ""
-    if getattr(oauth(), "okta", None) is not None:
-        buttons += f"""    <a href="/login/okta?return_to={rt}" class="btn btn-okta">
+    if getattr(oauth(), "oidc", None) is not None:
+        buttons += f"""    <a href="/login/oidc?return_to={rt}" class="btn btn-oidc">
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15a5 5 0 110-10 5 5 0 010 10z"/>
+        <path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6l-9-4zm-1 14-4-4 1.4-1.4L11 13.2l5.6-5.6L18 9l-7 7z"/>
       </svg>
-      Continue with Okta
+      Continue with {escape(get_settings().oidc_display_name)}
     </a>
 """
     if getattr(oauth(), "google", None) is not None:
@@ -183,7 +183,7 @@ async def login_page(request: Request, return_to: str = "/") -> HTMLResponse:
       transform: translateY(-1px);
     }}
     .btn svg {{ width: 16px; height: 16px; }}
-    .btn-okta svg {{ color: #007DC1; }}
+    .btn-oidc svg {{ color: #c4b5fd; }}
     .btn-google svg {{ color: #e8e8ee; }}
     .foot {{
       margin-top: 24px; padding-top: 20px;

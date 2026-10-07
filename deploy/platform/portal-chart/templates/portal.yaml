@@ -68,18 +68,24 @@ spec:
               value: {{ $.Values.portal.appsDomain | quote }}
             - name: PORTAL_ADMIN_EMAILS
               value: {{ $.Values.portal.adminEmails | quote }}
-            - name: PORTAL_OKTA_ISSUER
-              value: {{ if $.Values.portal.auth.okta.enabled }}{{ required "portal.auth.okta.issuer is required when okta is enabled" $.Values.portal.auth.okta.issuer | quote }}{{ else }}""{{ end }}
-            - name: PORTAL_OKTA_CLIENT_ID
-              value: {{ if $.Values.portal.auth.okta.enabled }}{{ required "portal.auth.okta.clientId is required when okta is enabled" $.Values.portal.auth.okta.clientId | quote }}{{ else }}""{{ end }}
+            - name: PORTAL_OIDC_DISPLAY_NAME
+              value: {{ $.Values.portal.auth.oidc.displayName | quote }}
+            - name: PORTAL_OIDC_SCOPES
+              value: {{ $.Values.portal.auth.oidc.scopes | toJson | quote }}
+            - name: PORTAL_OIDC_TOKEN_ENDPOINT_AUTH_METHOD
+              value: {{ $.Values.portal.auth.oidc.tokenEndpointAuthMethod | quote }}
+            - name: PORTAL_OIDC_ISSUER
+              value: {{ if $.Values.portal.auth.oidc.enabled }}{{ required "portal.auth.oidc.issuer is required when oidc is enabled" $.Values.portal.auth.oidc.issuer | quote }}{{ else }}""{{ end }}
+            - name: PORTAL_OIDC_CLIENT_ID
+              value: {{ if $.Values.portal.auth.oidc.enabled }}{{ required "portal.auth.oidc.clientId is required when oidc is enabled" $.Values.portal.auth.oidc.clientId | quote }}{{ else }}""{{ end }}
             - name: PORTAL_GOOGLE_CLIENT_ID
               value: {{ if $.Values.portal.auth.google.enabled }}{{ required "portal.auth.google.clientId is required when google is enabled" $.Values.portal.auth.google.clientId | quote }}{{ else }}""{{ end }}
-            - name: PORTAL_OKTA_CLIENT_SECRET
-              {{- if $.Values.portal.auth.okta.enabled }}
+            - name: PORTAL_OIDC_CLIENT_SECRET
+              {{- if $.Values.portal.auth.oidc.enabled }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ required "portal.auth.okta.clientSecretRef.name is required when okta is enabled" $.Values.portal.auth.okta.clientSecretRef.name | quote }}
-                  key: {{ required "portal.auth.okta.clientSecretRef.key is required when okta is enabled" $.Values.portal.auth.okta.clientSecretRef.key | quote }}
+                  name: {{ required "portal.auth.oidc.clientSecretRef.name is required when oidc is enabled" $.Values.portal.auth.oidc.clientSecretRef.name | quote }}
+                  key: {{ required "portal.auth.oidc.clientSecretRef.key is required when oidc is enabled" $.Values.portal.auth.oidc.clientSecretRef.key | quote }}
               {{- else }}
               value: ""
               {{- end }}

@@ -1,8 +1,7 @@
 """Group CRUD + membership management. Admin-only.
 
-In prod, group memberships are typically synced from Okta group claims on login;
-these endpoints give admins a way to manage them directly (e.g. for ad-hoc or
-internal-only groups not backed by Okta)."""
+Memberships are managed through the portal. Provider group claims are not
+automatically synchronized."""
 
 from __future__ import annotations
 

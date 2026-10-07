@@ -89,7 +89,7 @@ scripts/k8s/
 |---|---|---|
 | TLS | cert-manager + DNS-01 wildcard | HTTP only (port 80) |
 | Domain | `*.apps.example.com` | `*.iapportal.test` via `/etc/hosts` |
-| IdP | Okta / Google | mock-idp (alice/bob) |
+| IdP | OIDC / Google | mock-idp (alice/bob) |
 | Image registry | Your container registry | `minikube image load` |
 | Secrets | Kubernetes Secrets (optional External Secrets) | `secrets.existingSecret` when needed |
 | Ingress | Istio Gateway on LB | Gateway + `kubectl port-forward` |

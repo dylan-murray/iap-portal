@@ -56,7 +56,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "okta": {
+            "oidc": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -80,6 +80,31 @@
                 },
                 "issuer": {
                   "type": "string"
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "\\S"
+                },
+                "scopes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^\\S+$"
+                  },
+                  "contains": {
+                    "const": "openid"
+                  }
+                },
+                "tokenEndpointAuthMethod": {
+                  "type": "string",
+                  "enum": [
+                    "client_secret_basic",
+                    "client_secret_post"
+                  ]
                 }
               }
             },

@@ -13,8 +13,8 @@ registry, cloud, or secrets provider is required.
 - A CNI that enforces Kubernetes NetworkPolicy.
 - A parent domain such as `apps.example.com`, with `*.apps.example.com` pointing to
   the gateway and a matching TLS certificate.
-- Postgres and an Okta or Google OIDC application. Register
-  `https://portal.apps.example.com/auth/callback/okta` (or `/google`) as its callback.
+- Postgres and an application registered with your OIDC provider or Google. Register
+  `https://portal.apps.example.com/auth/callback/oidc` (or `/google`) as its callback.
 - Docker, kubectl, Helm, and permission to configure the Istio extension provider.
 
 ## Generate your installation configuration
@@ -82,13 +82,31 @@ Existing Kubernetes Secrets work directly; an external secrets controller is opt
 
 ## Install the portal
 
-Choose providers using `portal.auth.okta.enabled` and `portal.auth.google.enabled`.
-Both default to `false`; enable Okta, Google, or both. Production requires at
+Choose providers using `portal.auth.oidc.enabled` and `portal.auth.google.enabled`.
+Both default to `false`; enable OIDC, Google, or both. Production requires at
 least one. Only configured providers appear on the sign-in page; disabled provider
 login and callback URLs return 404. Disabling a provider prevents new sign-ins;
 existing sessions retain their normal lifetime and can be revoked separately.
 
-Provider configuration is grouped under `portal.auth`. Okta accepts `issuer`,
+The generic provider uses OpenID Connect discovery and authorization code flow
+with PKCE (S256). Set `issuer` to the issuer URL, not the discovery document URL.
+Register `/auth/callback/oidc` with your provider. Okta can use this generic path.
+SAML and OAuth-only providers are not supported.
+
+`displayName` sets the “Continue with …” button label (default `SSO`). `scopes`
+defaults to `[openid, email, profile]` and must include `openid`. Request additional
+provider scopes when needed. `tokenEndpointAuthMethod` supports
+`client_secret_basic` (default) or `client_secret_post` to match your provider.
+The validated ID token must supply `sub`, `email`, and `email_verified: true`.
+Configure your provider's claim mappings to supply these claims. Group membership
+is managed in the portal, not automatically synchronized from provider claims.
+
+For native deployments, the equivalent environment variables are
+`PORTAL_OIDC_ISSUER`, `PORTAL_OIDC_CLIENT_ID`, `PORTAL_OIDC_CLIENT_SECRET`,
+`PORTAL_OIDC_DISPLAY_NAME`, `PORTAL_OIDC_SCOPES` (a JSON array), and
+`PORTAL_OIDC_TOKEN_ENDPOINT_AUTH_METHOD`.
+
+Provider configuration is grouped under `portal.auth`. OIDC accepts `issuer`,
 `clientId`, and `clientSecretRef`; Google accepts `clientId` and `clientSecretRef`
 (the Google issuer is fixed). Each secret reference specifies an existing Kubernetes
 Secret `name` and `key` in the portal's namespace. The two providers can reference
@@ -101,13 +119,15 @@ For example, to offer both providers:
 ```yaml
 portal:
   auth:
-    okta:
+    oidc:
       enabled: true
-      issuer: https://YOUR_TENANT.okta.com/oauth2/default
-      clientId: YOUR_OKTA_CLIENT_ID
+      displayName: Company SSO
+      scopes: [openid, email, profile]
+      issuer: https://idp.example.com
+      clientId: YOUR_OIDC_CLIENT_ID
       clientSecretRef:
         name: portal-oauth
-        key: okta-client-secret
+        key: oidc-client-secret
     google:
       enabled: true
       clientId: YOUR_GOOGLE_CLIENT_ID
@@ -119,12 +139,12 @@ portal:
 
 Set either `enabled` to false for a single-provider deployment. Create the referenced
 Secret through your chosen secrets workflow before installing. For example, the
-Secret above must contain `okta-client-secret` and `google-client-secret`. No secret
+Secret above must contain `oidc-client-secret` and `google-client-secret`. No secret
 values go into Helm values or rendered manifests. Missing required references fail
 chart rendering; missing Secrets or keys prevent the pod from starting.
 
 Register the following redirect URIs in the respective OAuth applications:
-`https://portal.<your-domain>/auth/callback/okta` and
+`https://portal.<your-domain>/auth/callback/oidc` and
 `https://portal.<your-domain>/auth/callback/google`.
 Set `portal.googleHostedDomains` or `portal.allowedEmailDomains` to restrict Google
 sign-in to your organization.
@@ -141,13 +161,13 @@ portal:
   baseUrl: https://portal.apps.example.com
   adminEmails: admin@example.com
   auth:
-    okta:
+    oidc:
       enabled: true
-      issuer: https://YOUR_TENANT.okta.com/oauth2/default
+      issuer: https://idp.example.com
       clientId: YOUR_CLIENT_ID
       clientSecretRef:
         name: portal-oauth
-        key: okta-client-secret
+        key: oidc-client-secret
     google:
       enabled: false
   allowedEmailDomains: [example.com]   # optional sign-in admission

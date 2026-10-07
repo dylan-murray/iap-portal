@@ -140,7 +140,9 @@ ASGI app with `uvicorn iap_portal_server.main:create_authorization_app --factory
 --host 0.0.0.0 --port 8091` and enforce equivalent gateway-only access.
 
 
-## Explicit Helm authentication providers
+## Explicit Helm authentication providers (before generic OIDC)
+
+For current releases, also apply [Generic OIDC provider](#generic-oidc-provider) below.
 
 Set `portal.auth.okta.enabled: true` and/or `portal.auth.google.enabled: true`
 when upgrading the portal chart. Both default to false. Existing issuer/client ID
@@ -172,3 +174,28 @@ route-admission policies, mesh/DNS routing, and gateway authorization principals
 together. Registration must update each app's upstream address before cutover.
 Verify authentication and app isolation before removing the previous resources.
 A plain Helm upgrade is not a namespace migration.
+
+
+## Generic OIDC provider
+
+The configurable provider is now `oidc`. Google remains a separate option.
+Before upgrading:
+
+- Rename `portal.auth.okta` to `portal.auth.oidc` in Helm values. Old chart keys
+  are rejected. Existing client-secret references can keep their current Secret
+  names and keys.
+- Rename `PORTAL_OKTA_ISSUER`, `PORTAL_OKTA_CLIENT_ID`, and
+  `PORTAL_OKTA_CLIENT_SECRET` to their `PORTAL_OIDC_*` equivalents for native
+  deployments. The old environment variables are no longer used.
+- Register `/auth/callback/oidc` instead of `/auth/callback/okta` with your IdP.
+  In-flight sign-ins using the old route must restart.
+- Set `portal.auth.oidc.displayName` (default `SSO`) and `scopes` (default
+  `[openid, email, profile]`). The old implicit `groups` scope is no longer
+  requested. Add it explicitly if your provider requires it. Provider group
+  claims are not automatically imported into portal memberships.
+
+Migration `0003` renames existing `okta` identity and session provider fields to
+`oidc`, preserving their users, issuer/subject bindings, sessions, and grants.
+Keep the same issuer when upgrading an existing provider. Switching issuers is
+an identity migration, not a label change. Back up the database before upgrading
+and finish the migration before serving traffic with the new version.

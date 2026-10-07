@@ -68,9 +68,9 @@ services:
       PORTAL_PORTAL_BASE_URL: http://portal.iapportal.test:${IAP_PORTAL_GATEWAY_PORT:-8090}
       PORTAL_DATABASE_URL: postgresql+asyncpg://portal:portal@db/portal
       PORTAL_SESSION_SECRET: dev-secret-change-me-to-something-32chars
-      PORTAL_OKTA_ISSUER: http://mock-idp.iapportal.test:${IAP_PORTAL_IDP_PORT:-8081}
-      PORTAL_OKTA_CLIENT_ID: portal-local
-      PORTAL_OKTA_CLIENT_SECRET: secret
+      PORTAL_OIDC_ISSUER: http://mock-idp.iapportal.test:${IAP_PORTAL_IDP_PORT:-8081}
+      PORTAL_OIDC_CLIENT_ID: portal-local
+      PORTAL_OIDC_CLIENT_SECRET: secret
       # Admin list — source of truth is this env var. No UI/API mutates it.
       PORTAL_ADMIN_EMAILS: alice@example.com
       # Operator credential for the local CLI (`iap-portal apply`). In
