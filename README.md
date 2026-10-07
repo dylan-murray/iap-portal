@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<h3 align="center">Access control for AI-built internal tools</h3>
+<h3 align="center">Identity-aware proxy and app portal for internal tools</h3>
 
 <p align="center">
   <a href="https://github.com/dylan-murray/iap-portal/actions/workflows/portal-ci.yml"><img src="https://github.com/dylan-murray/iap-portal/actions/workflows/portal-ci.yml/badge.svg" alt="CI"></a>
@@ -15,10 +15,14 @@
 
 <h2></h2>
 
+iap-portal is an open-source **identity-aware proxy (IAP) and app portal**, built
+on Kubernetes and Istio. It checks who a user is and whether they can access an
+app before forwarding their request.
+
 AI makes it easy to build internal tools. iap-portal gives your team a way to
 share them with sign-in and access controls built in. Ship a Streamlit tool, a
-Gradio demo, a FastAPI service, or a custom web app. The gateway checks access.
-App owners decide who can use their tools from the portal.
+Gradio demo, a FastAPI service, or a custom web app. App owners decide who can
+use their tools from the portal.
 
 <img src="assets/portal-demo.gif" alt="IAP Portal demo: browse apps, approve an access request, grant time-limited access, and launch an interactive Streamlit app">
 
@@ -195,8 +199,9 @@ implemented controls, and remaining validation gaps before deploying it for a te
 ## ❓ FAQ
 
 **Is this an identity provider?** No. OIDC or Google authenticates the user.
-iap-portal handles app discovery and app-level access, with Istio enforcing the
-access decision at the gateway.
+iap-portal provides the identity-aware proxy layer and app catalog, using your
+existing identity provider for sign-in and Istio to enforce app-level access
+at the gateway.
 
 **Do I have to use Python?** No. Custom web apps can sit behind the gateway.
 The Python SDK and framework images are conveniences for Python applications.
