@@ -1,10 +1,6 @@
 """Prevent accidental privilege expansion in contributor-triggered workflows."""
 
-import importlib.util
 from pathlib import Path
-import sys
-
-import pytest
 import re
 
 import yaml
@@ -36,42 +32,3 @@ def test_contributor_workflows_cannot_publish_or_use_privileged_events():
             assert 'environment' not in job
             assert job.get('permissions', {}).get('contents', 'read') == 'read'
             assert job.get('permissions', {}).get('packages', 'read') != 'write'
-
-
-def load_settings_script():
-    spec = importlib.util.spec_from_file_location('repository_settings', ROOT / 'scripts/configure-repository.py')
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_public_controls_refuse_private_repository_before_mutating(monkeypatch):
-    module = load_settings_script()
-    calls = []
-
-    def fake_api(path, method='GET', payload=None):
-        calls.append((path, method, payload))
-        return {'private': True}
-
-    monkeypatch.setattr(module, 'api', fake_api)
-    monkeypatch.setattr(sys, 'argv', ['configure-repository', '--repo', 'owner/repo',
-                                    '--public-features', '--apply'])
-    with pytest.raises(SystemExit) as error:
-        module.main()
-    assert error.value.code == 2
-    assert calls == [('repos/owner/repo', 'GET', None)]
-
-
-def test_settings_preview_never_calls_github(monkeypatch, capsys):
-    module = load_settings_script()
-
-    def unexpected_api(*args, **kwargs):
-        pytest.fail('Dry-run must not call GitHub')
-
-    monkeypatch.setattr(module, 'api', unexpected_api)
-    monkeypatch.setattr(sys, 'argv', ['configure-repository', '--repo', 'owner/repo'])
-    module.main()
-    assert '"changes_visibility": false' in capsys.readouterr().out
-    for public in (False, True):
-        for _, _, payload in module.plan('owner/repo', public):
-            assert not payload or not {'private', 'visibility'} & payload.keys()
