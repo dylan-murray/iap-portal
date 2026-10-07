@@ -59,7 +59,9 @@ async def test_feedback_absent_by_default_and_on_private_listener(settings):
     async with AsyncClient(transport=ASGITransport(app), base_url=ORIGIN) as client:
         assert (await client.get("/dev/annotations")).status_code == 404
     settings.set(enable_dev_annotations=True)
-    assert not any(r.path.startswith("/dev/annotations") for r in create_authorization_app().routes)
+    async with AsyncClient(transport=ASGITransport(create_authorization_app()), base_url=ORIGIN) as client:
+        assert (await client.get("/dev/annotations")).status_code == 404
+        assert (await client.post("/dev/annotations", json=PAYLOAD)).status_code == 404
 
 
 def test_feedback_flag_rejected_outside_dev(settings):

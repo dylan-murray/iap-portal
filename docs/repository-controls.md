@@ -47,3 +47,16 @@ are exempt from that general rule. Version tags can only be managed by admins.
 The script is repeatable and updates rulesets by name. A failed API request stops
 the script; earlier settings may already have applied. Fix the cause, rerun, and
 verify the settings above. Never treat a partially completed run as protected.
+
+## Dependency review before launch
+
+The October 2026 dependency refresh updates the Python environment and exported
+container requirements, plus Vite and compatible frontend dependencies. The
+frontend production dependency audit is clean. Tailwind 3's development-only
+dependency tree still includes advisories in `braces` and selector parsing.
+`braces` has no patched 3.x release in the registry at this review. These packages
+run during builds, not in the deployed browser bundle or Python server.
+
+Keep untrusted builds on disposable hosted runners without deployment secrets.
+Resolve the Tailwind toolchain upgrade and rerun the full npm audit before marking
+launch security review complete; do not dismiss the alerts merely to clear them.
