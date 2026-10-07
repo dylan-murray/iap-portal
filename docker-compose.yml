@@ -46,6 +46,7 @@ services:
         aliases: [mock-idp.iapportal.test]
     environment:
       MOCK_IDP_ISSUER: http://mock-idp.iapportal.test:${IAP_PORTAL_IDP_PORT:-8081}
+      MOCK_IDP_REDIRECT_URIS: http://portal.iapportal.test:${IAP_PORTAL_GATEWAY_PORT:-8090}/auth/callback/oidc,http://localhost:8088/auth/callback/oidc
       USERS_CONFIGURATION_INLINE: |
         [
           {"SubjectId":"u1","Username":"alice","Password":"x","Claims":[

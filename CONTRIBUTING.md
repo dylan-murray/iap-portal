@@ -33,9 +33,6 @@ The PostgreSQL integration test skips unless `IAP_TEST_POSTGRES_URL` points to a
 disposable PostgreSQL database using a `postgresql+asyncpg://` URL. It creates and
 removes an isolated schema; CI supplies a PostgreSQL 16 service automatically.
 
-Repository maintainers can follow [repository controls](docs/repository-controls.md)
-for the public-launch settings and verification steps.
-
 The frontend uses Tailwind 4 through `@tailwindcss/postcss`; theme values and custom
 utilities live in `frontend/src/style.css`. Browser support follows Tailwind 4:
 Safari 16.4+, Chrome 111+, and Firefox 128+. Run `npm audit` as well as the build
