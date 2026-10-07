@@ -32,8 +32,9 @@ provides those pieces once, so each app can use the same deployment and access m
   requests, user and group grants, and expiration.
 - **Sign-in at the gateway.** Configure your OIDC provider, Google, or both. Istio checks access
   before forwarding traffic to an app.
-- **Apps as code.** An `iap-app.yaml` file describes the image, route, owners, and
-  runtime settings. Deploy with Helm or use the reusable GitHub Actions workflow.
+- **Ship updates with a git push.** Once an app's deployment workflow is configured,
+  CI builds its image, deploys it, and registers it in the portal. An `iap-app.yaml`
+  file keeps its route, owners, and runtime settings in code.
 - **Built for interactive apps.** WebSockets and streaming work through the
   gateway. The bundled Streamlit and FastAPI apps exercise both.
 - **Your infrastructure.** Use your registry, Postgres, domains, and Kubernetes
@@ -120,6 +121,17 @@ Secret requirements, and Google Workspace domain restrictions.
 
 ## 📦 Ship an app
 
+**Set up the platform once. Ship tools with a git push.**
+
+Scaffold your app, configure its deployment workflow, and push. CI builds the
+image, deploys it, and registers it in the portal. App owners manage access from
+the UI.
+
+The platform setup is shared across apps. Each new app needs its own registry
+settings, deployment credentials, and prepared namespace. Once those are in place,
+routine updates are a git push through the configured workflow. You can also
+deploy directly with Helm.
+
 Install the CLI from this checkout and scaffold a project:
 
 ```bash
@@ -149,19 +161,22 @@ registration:
 
 The `slug` and `domain` form the app URL: `my-tool.apps.example.com`.
 
-Configure your registry and deployment credentials, prepare the app namespace,
-and deploy with Helm or GitHub Actions. The registration Job uses a projected
-ServiceAccount token. App namespaces do not need the portal's admin credential.
+For the first deployment, follow the walkthrough below to configure the registry
+and CI credentials and have your platform operator prepare the app namespace.
+The registration Job uses a projected ServiceAccount token. App namespaces do not
+need the portal's admin credential.
 See [Adding an app](docs/ADDING_AN_APP.md) for the complete walkthrough.
 
 ## ⚙️ How it works
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-dark.svg">
-  <img src="assets/how-it-works-light.svg" alt="Four steps: sign in with OIDC or Google, choose an app in the portal, let the gateway check access with the portal, and open the app if allowed.">
+  <img src="assets/how-it-works-light.svg" alt="Authentication architecture: browser to gateway to app, with numbered authorization calls to IAP Portal. The portal connects to an OIDC provider for sign-in and Postgres for identities, sessions, app records, and access grants.">
 </picture>
 
-The gateway asks the portal whether the user may access the app. Each app gets
+The gateway (Istio on Kubernetes, Envoy in Compose) checks access on every request.
+For WebSockets, the check runs when the connection opens.
+App owners decide who is allowed through using the portal. Each app gets
 its own session cookie and app-scoped token. It never receives the portal session.
 The optional Python SDK verifies the signed token and exposes a typed user object.
 Apps remain responsible for permissions inside their own application.

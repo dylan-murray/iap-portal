@@ -1,31 +1,91 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 250" role="img" aria-label="From sign-in to an internal app in four steps">
-<rect width="1200" height="250" rx="18" fill="#f6f8fa"/>
-<g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">
-<rect x="24" y="24" width="264" height="202" rx="12" fill="#ffffff" stroke="#d1d9e0"/>
-<circle cx="56" cy="60" r="16" fill="#7c3aed"/>
-<text x="56" y="66" text-anchor="middle" fill="#f6f8fa" font-size="18" font-weight="700">1</text>
-<text x="44" y="113" fill="#1f2328" font-size="25" font-weight="600">Sign in</text>
-<text x="44" y="151" fill="#59636e" font-size="17">Use your company account</text>
-<text x="44" y="177" fill="#59636e" font-size="17">with OIDC or Google.</text>
-<path d="M295 125h18m-6-6 6 6-6 6" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="320" y="24" width="264" height="202" rx="12" fill="#ffffff" stroke="#d1d9e0"/>
-<circle cx="352" cy="60" r="16" fill="#7c3aed"/>
-<text x="352" y="66" text-anchor="middle" fill="#f6f8fa" font-size="18" font-weight="700">2</text>
-<text x="340" y="113" fill="#1f2328" font-size="25" font-weight="600">Choose an app</text>
-<text x="340" y="151" fill="#59636e" font-size="17">Find your internal tools</text>
-<text x="340" y="177" fill="#59636e" font-size="17">in the portal.</text>
-<path d="M591 125h18m-6-6 6 6-6 6" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="616" y="24" width="264" height="202" rx="12" fill="#ffffff" stroke="#d1d9e0"/>
-<circle cx="648" cy="60" r="16" fill="#7c3aed"/>
-<text x="648" y="66" text-anchor="middle" fill="#f6f8fa" font-size="18" font-weight="700">3</text>
-<text x="636" y="113" fill="#1f2328" font-size="25" font-weight="600">Check access</text>
-<text x="636" y="151" fill="#59636e" font-size="17">The gateway asks the portal</text>
-<text x="636" y="177" fill="#59636e" font-size="17">whether you have access.</text>
-<path d="M887 125h18m-6-6 6 6-6 6" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="912" y="24" width="264" height="202" rx="12" fill="#ffffff" stroke="#d1d9e0"/>
-<circle cx="944" cy="60" r="16" fill="#7c3aed"/>
-<text x="944" y="66" text-anchor="middle" fill="#f6f8fa" font-size="18" font-weight="700">4</text>
-<text x="932" y="113" fill="#1f2328" font-size="25" font-weight="600">Open the app</text>
-<text x="932" y="151" fill="#59636e" font-size="17">Allowed requests reach</text>
-<text x="932" y="177" fill="#59636e" font-size="17">the app with your identity.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc"><title id="title">IAP Portal authentication architecture</title><desc id="desc">App traffic flows from browser to gateway to app. The gateway asks the portal’s private authorization endpoint to validate sessions and permissions stored in Postgres. The portal authenticates users with an OIDC provider, creates isolated sessions, and issues app-scoped identity tokens.</desc><defs>
+<marker id="auth" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#7c3aed"/></marker>
+<marker id="login" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#0969da"/></marker>
+<marker id="allow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#18794e"/></marker>
+</defs>
+<rect width="1200" height="900" rx="18" fill="#f6f8fa"/><g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">
+<text x="30" y="43" font-size="29" fill="#1f2328" text-anchor="start" font-weight="650">How authentication and app access work</text>
+<rect x="30" y="85" width="270" height="215" rx="12" fill="#fff" stroke="#d1d9e0" stroke-width="1"/>
+<text x="48" y="119" font-size="25" fill="#1f2328" text-anchor="start" font-weight="650">Browser</text>
+<text x="48" y="148" font-size="17" fill="#59636e" text-anchor="start" font-weight="400">Separate host-only cookies</text>
+<path d="M48 165H282" stroke="#d1d9e0"/>
+<text x="48" y="195" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Portal cookie → portal only</text>
+<text x="48" y="219" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">App cookie → this app only</text>
+<text x="48" y="243" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Neither reaches app code</text>
+<text x="48" y="267" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">App sessions depend on</text>
+<text x="48" y="291" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">the parent portal session</text>
+<rect x="460" y="85" width="280" height="215" rx="12" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
+<text x="478" y="119" font-size="25" fill="#1f2328" text-anchor="start" font-weight="650">Gateway</text>
+<text x="478" y="148" font-size="17" fill="#7c3aed" text-anchor="start" font-weight="400">Istio · Envoy with Compose</text>
+<path d="M478 165H722" stroke="#d1d9e0"/>
+<text x="478" y="195" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Pauses requests for auth</text>
+<text x="478" y="219" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Replaces identity headers</text>
+<text x="478" y="243" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Strips session cookies</text>
+<text x="478" y="267" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Forwards only when allowed</text>
+<text x="478" y="291" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Denial / error blocks access</text>
+<rect x="900" y="85" width="270" height="215" rx="12" fill="#fff" stroke="#d1d9e0" stroke-width="1"/>
+<text x="918" y="119" font-size="25" fill="#1f2328" text-anchor="start" font-weight="650">Your app</text>
+<text x="918" y="148" font-size="17" fill="#59636e" text-anchor="start" font-weight="400">Streamlit · Gradio · HTTP apps</text>
+<path d="M918 165H1152" stroke="#d1d9e0"/>
+<text x="918" y="195" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Receives app-scoped JWT</text>
+<text x="918" y="219" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">SDK verifies signature,</text>
+<text x="918" y="243" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">issuer, audience and expiry</text>
+<text x="918" y="267" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Audience must match app</text>
+<text x="918" y="291" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Keeps its own permissions</text>
+<path d="M300 175H456" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#auth)"/>
+<text x="380" y="153" font-size="19" fill="#7c3aed" text-anchor="middle" font-weight="600">1. Request</text>
+<text x="380" y="205" font-size="17" fill="#59636e" text-anchor="middle" font-weight="400">App cookie</text>
+<path d="M740 175H896" fill="none" stroke="#18794e" stroke-width="2.5" marker-end="url(#allow)"/>
+<text x="820" y="153" font-size="19" fill="#18794e" text-anchor="middle" font-weight="600">4. Forward</text>
+<text x="820" y="205" font-size="17" fill="#59636e" text-anchor="middle" font-weight="400">JWT + identity</text>
+<path d="M520 300V440" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#auth)"/>
+<text x="500" y="346" font-size="19" fill="#7c3aed" text-anchor="end" font-weight="600">2. Check access</text>
+<text x="500" y="374" font-size="17" fill="#59636e" text-anchor="end" font-weight="400">Private /auth/verify</text>
+<text x="500" y="399" font-size="16" fill="#59636e" text-anchor="end" font-weight="400">Host, path, method, cookie</text>
+<path d="M680 445V305" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#auth)"/>
+<text x="700" y="346" font-size="19" fill="#7c3aed" text-anchor="start" font-weight="600">3. Decision</text>
+<text x="700" y="374" font-size="17" fill="#59636e" text-anchor="start" font-weight="400">200 + JWT, or deny</text>
+<text x="700" y="399" font-size="16" fill="#59636e" text-anchor="start" font-weight="400">302 if session is missing</text>
+<rect x="30" y="445" width="270" height="245" rx="12" fill="#fff" stroke="#0969da" stroke-width="2"/>
+<text x="48" y="479" font-size="25" fill="#1f2328" text-anchor="start" font-weight="650">Identity provider</text>
+<text x="48" y="508" font-size="17" fill="#0969da" text-anchor="start" font-weight="400">Generic OIDC or Google</text>
+<path d="M48 525H282" stroke="#d1d9e0"/>
+<text x="48" y="555" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Code flow + PKCE</text>
+<text x="48" y="579" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">State + nonce bind login</text>
+<text x="48" y="603" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Portal validates ID token</text>
+<text x="48" y="627" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Issuer + subject identify user</text>
+<text x="48" y="651" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Verified email required</text>
+<rect x="460" y="445" width="280" height="245" rx="12" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
+<text x="478" y="479" font-size="25" fill="#1f2328" text-anchor="start" font-weight="650">IAP Portal</text>
+<text x="478" y="508" font-size="17" fill="#7c3aed" text-anchor="start" font-weight="400">Public login · private auth</text>
+<path d="M478 525H722" stroke="#d1d9e0"/>
+<text x="478" y="555" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Valid host + origin?</text>
+<text x="478" y="579" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">App + parent session active?</text>
+<text x="478" y="603" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">User active + app enabled?</text>
+<text x="478" y="627" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Admin, owner, or live</text>
+<text x="478" y="651" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">user/group grant?</text>
+<rect x="900" y="445" width="270" height="245" rx="12" fill="#fff" stroke="#d1d9e0" stroke-width="1"/>
+<text x="918" y="479" font-size="25" fill="#1f2328" text-anchor="start" font-weight="650">Postgres</text>
+<text x="918" y="508" font-size="17" fill="#59636e" text-anchor="start" font-weight="400">Inside or outside the cluster</text>
+<path d="M918 525H1152" stroke="#d1d9e0"/>
+<text x="918" y="555" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Users + group memberships</text>
+<text x="918" y="579" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Apps + owners + grants</text>
+<text x="918" y="603" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Portal + app sessions</text>
+<text x="918" y="627" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Single-use sign-in codes</text>
+<text x="918" y="651" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Audit events</text>
+<path d="M300 550H456" fill="none" stroke="#0969da" stroke-width="2.5" marker-end="url(#login)" marker-start="url(#login)"/>
+<text x="380" y="528" font-size="18" fill="#0969da" text-anchor="middle" font-weight="600">Sign-in</text>
+<text x="380" y="580" font-size="17" fill="#59636e" text-anchor="middle" font-weight="400">Code + ID token</text>
+<text x="380" y="607" font-size="16" fill="#59636e" text-anchor="middle" font-weight="400">Browser redirects</text>
+<path d="M740 550H896" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#auth)" marker-start="url(#auth)"/>
+<text x="820" y="528" font-size="18" fill="#7c3aed" text-anchor="middle" font-weight="600">Read / write</text>
+<text x="820" y="580" font-size="17" fill="#59636e" text-anchor="middle" font-weight="400">Sessions +</text>
+<text x="820" y="607" font-size="17" fill="#59636e" text-anchor="middle" font-weight="400">access state</text>
+<path d="M30 722H1170" stroke="#d1d9e0"/>
+<text x="30" y="758" font-size="20" fill="#1f2328" text-anchor="start" font-weight="600">No app session?</text>
+<text x="240" y="758" font-size="19" fill="#1f2328" text-anchor="start" font-weight="400">Redirect to portal sign-in → single-use code → host-only app cookie.</text>
+<text x="240" y="788" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">Code expires in 60s by default. The app session cannot outlive the portal session.</text>
+<text x="30" y="834" font-size="20" fill="#1f2328" text-anchor="start" font-weight="600">Access allowed?</text>
+<text x="240" y="834" font-size="19" fill="#1f2328" text-anchor="start" font-weight="400">Portal signs an RS256 JWT for this app (5-minute default lifetime).</text>
+<text x="240" y="864" font-size="18" fill="#59636e" text-anchor="start" font-weight="400">The SDK uses the portal’s JWKS to verify it. App access is checked on each request.</text>
 </g></svg>
