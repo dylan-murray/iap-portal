@@ -23,3 +23,15 @@ configuration names. Test generated apps as well as the platform itself.
 Use example.com or reserved .test domains for fixtures. Never commit private keys,
 real credentials, or local agent state. See [Security](docs/SECURITY.md) for known
 release gaps. Tests passing is not evidence of a live cluster security review.
+
+Open a pull request for changes. CI checks Python 3.10–3.14, the frontend build,
+Helm charts, Compose configuration, and PostgreSQL migrations and session behavior.
+Security workflows scan code and dependency changes. Workflows use pinned Actions
+and read-only tokens; publishing runs separately with release approval.
+
+The PostgreSQL integration test skips unless `IAP_TEST_POSTGRES_URL` points to a
+disposable PostgreSQL database using a `postgresql+asyncpg://` URL. It creates and
+removes an isolated schema; CI supplies a PostgreSQL 16 service automatically.
+
+Repository maintainers can follow [repository controls](docs/repository-controls.md)
+for the public-launch settings and verification steps.

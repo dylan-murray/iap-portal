@@ -3,40 +3,114 @@ on:
   push:
     branches: [main]
   pull_request: {}
+  workflow_dispatch: {}
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   python:
+    name: python (${{ matrix.python }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: ${{ matrix.python }}
       - run: uv sync --all-extras --locked
       - run: uv run pytest backend/tests sdk/tests tests -q
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: '3.12'
+      - run: uv sync --all-extras --locked
+      - run: uv run ruff check --select E9,F63,F7,F82 backend sdk scripts tests
       - run: uv run python scripts/check_portability.py
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: '20'
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - working-directory: frontend
         run: npm ci && npm run build
   charts:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
       - run: helm lint charts/iap-app --set slug=demo --set image.repository=example/demo
       - run: helm lint deploy/platform/portal-chart --set image.repository=example/portal
       - run: docker compose --profile full config --quiet
       - run: bash scripts/package-charts.sh dist/charts
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: helm-charts
           path: dist/charts/*.tgz
           if-no-files-found: error
+          retention-days: 7
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: portal
+          POSTGRES_PASSWORD: local-ci-only
+          POSTGRES_DB: portal_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      IAP_TEST_POSTGRES_URL: postgresql+asyncpg://portal:local-ci-only@localhost:5432/portal_test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: '3.12'
+      - run: uv sync --all-extras --locked
+      - run: uv run pytest backend/tests/test_postgres.py -q
+  ci:
+    name: ci
+    if: ${{ always() }}
+    needs: [python, lint, frontend, charts, postgres]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      RESULTS: ${{ toJSON(needs) }}
+    steps:
+      - name: Require all jobs to succeed
+        run: |
+          python - <<'PYCODE'
+          import json, os
+          results = json.loads(os.environ['RESULTS'])
+          assert all(job['result'] == 'success' for job in results.values()), results
+          PYCODE
