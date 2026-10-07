@@ -10,10 +10,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    for table in ("user_identities", "auth_sessions"):
-        op.execute(sa.text(f"UPDATE {table} SET provider = 'oidc' WHERE provider = 'okta'"))
+    for name in ("user_identities", "auth_sessions"):
+        table = sa.table(name, sa.column("provider", sa.String()))
+        op.execute(table.update().where(table.c.provider == "okta").values(provider="oidc"))
 
 
 def downgrade() -> None:
-    for table in ("user_identities", "auth_sessions"):
-        op.execute(sa.text(f"UPDATE {table} SET provider = 'okta' WHERE provider = 'oidc'"))
+    for name in ("user_identities", "auth_sessions"):
+        table = sa.table(name, sa.column("provider", sa.String()))
+        op.execute(table.update().where(table.c.provider == "oidc").values(provider="okta"))
