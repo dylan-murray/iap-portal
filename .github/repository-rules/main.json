@@ -38,7 +38,8 @@
         "allowed_merge_methods": [
           "merge",
           "squash"
-        ]
+        ],
+        "require_extra_approval_for_unattributed_changes": true
       }
     },
     {

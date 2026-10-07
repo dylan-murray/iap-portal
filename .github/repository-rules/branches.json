@@ -15,8 +15,7 @@
         "~ALL"
       ],
       "exclude": [
-        "refs/heads/main",
-        "refs/heads/dependabot/**"
+        "refs/heads/main"
       ]
     }
   },

@@ -28,8 +28,8 @@ The `release` environment requires the owner's approval and protected branches.
 Main requires a pull request, one approving review, code-owner review, resolved
 threads, and current passing CI, Semgrep, CodeQL, and dependency-review checks.
 Admin bypass is limited to pull requests so the sole owner can merge their own
-reviewed changes. Branches reject deletion and force pushes; Dependabot branches
-are exempt from that general rule. Version tags can only be managed by admins.
+reviewed changes. All branches reject deletion and force pushes; admins retain the same branch
+maintenance bypass as the other public repositories. Version tags can only be managed by admins.
 
 ## Verify before publishing a release
 
@@ -58,3 +58,10 @@ CI runs `npm audit --audit-level=moderate` before building the frontend.
 
 Keep untrusted builds on disposable hosted runners without deployment secrets.
 Review new dependency alerts and fixes rather than dismissing them to clear a gate.
+
+## Public-launch baseline
+
+IAP Portal follows Sigil's branch/tag protection and external-contributor approval
+model. Its Actions controls remain stricter: read-only tokens, full-SHA pinning,
+and an explicit third-party action allowlist. Only the repository owner has write
+access. Release publication requires the protected release environment's approval.
