@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="72" viewBox="0 0 360 72" role="img" aria-label="iap-portal">
+  <defs><linearGradient id="tile" x2="1" y2="1"><stop stop-color="#a855f7"/><stop offset=".55" stop-color="#ec4899"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+  <rect x="4" y="4" width="64" height="64" rx="16" fill="url(#tile)"/>
+  <path transform="translate(16 16) scale(.833333)" fill="white" fill-rule="evenodd" d="M7 44V19a17 17 0 0 1 34 0v25H7Zm17-33a8 8 0 0 0-4 15l-3 11h14l-3-11a8 8 0 0 0-4-15Z"/>
+  <text x="86" y="49" fill="#e8e8ee" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="42" font-weight="650" letter-spacing="-1.5">iap-portal</text>
+</svg>
