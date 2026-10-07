@@ -327,7 +327,7 @@ async function toggleEnabled() {
           <li
             v-for="r in pendingRequests"
             :key="r.id"
-            class="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg bg-white/[0.03] px-4 py-3 ring-1 ring-white/5"
+            class="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg bg-white/3 px-4 py-3 ring-1 ring-white/5"
           >
             <div class="flex-1 min-w-0">
               <div class="text-sm text-slate-100 truncate">{{ r.requester_email }}</div>
@@ -343,7 +343,7 @@ async function toggleEnabled() {
                 :value="requestDuration[r.id] ?? 0"
                 @change="requestDuration[r.id] = Number(($event.target as HTMLSelectElement).value)"
                 title="Grant duration"
-                class="rounded-md bg-white/5 border border-white/10 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition"
+                class="rounded-md bg-white/5 border border-white/10 px-2 py-1 text-xs text-slate-100 focus:outline-hidden focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition"
               >
                 <option v-for="opt in durationOptions" :key="opt.hours" :value="opt.hours">
                   {{ opt.label }}
@@ -405,13 +405,13 @@ async function toggleEnabled() {
               />
               <span class="text-slate-200">{{ g.user_email || g.group_name }}</span>
               <span
-                class="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-slate-400"
+                class="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-white/5 text-slate-400"
               >
                 {{ g.user_email ? "user" : "group" }}
               </span>
               <span
                 v-if="formatExpiry(g.expires_at).tone === 'permanent'"
-                class="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20"
+                class="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20"
                 title="No expiration"
               >
                 <i class="pi pi-infinity" style="font-size: 0.55rem" />
@@ -419,7 +419,7 @@ async function toggleEnabled() {
               </span>
               <span
                 v-else-if="formatExpiry(g.expires_at).tone === 'soon'"
-                class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20"
+                class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-sm bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20"
                 :title="g.expires_at ?? ''"
               >
                 <i class="pi pi-clock" style="font-size: 0.55rem" />
@@ -427,7 +427,7 @@ async function toggleEnabled() {
               </span>
               <span
                 v-else
-                class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 ring-1 ring-sky-500/20"
+                class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-sm bg-sky-500/10 text-sky-300 ring-1 ring-sky-500/20"
                 :title="g.expires_at ?? ''"
               >
                 <i class="pi pi-clock" style="font-size: 0.55rem" />
@@ -479,12 +479,12 @@ async function toggleEnabled() {
             v-model="grantTarget"
             type="email"
             placeholder="user@example.com"
-            class="flex-1 min-w-[180px] rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+            class="flex-1 min-w-[180px] rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
           />
           <select
             v-else
             v-model="grantTarget"
-            class="flex-1 min-w-[180px] rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+            class="flex-1 min-w-[180px] rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
           >
             <option value="" disabled>Pick a group…</option>
             <option v-for="g in groupNames" :key="g" :value="g">{{ g }}</option>
@@ -492,7 +492,7 @@ async function toggleEnabled() {
           <select
             v-model.number="grantDurationHours"
             title="Access duration"
-            class="rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+            class="rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
           >
             <option v-for="opt in durationOptions" :key="opt.hours" :value="opt.hours">
               {{ opt.label }}
@@ -550,7 +550,7 @@ async function toggleEnabled() {
             v-model="newOwner"
             type="email"
             placeholder="new-owner@example.com"
-            class="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
+            class="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition"
           />
           <button type="submit" class="btn-primary" :disabled="ownerBusy || !newOwner.trim()">
             <i

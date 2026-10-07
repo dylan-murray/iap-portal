@@ -54,7 +54,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - working-directory: frontend
-        run: npm ci && npm run build
+        run: npm ci && npm audit --audit-level=moderate && npm run build
   charts:
     runs-on: ubuntu-latest
     timeout-minutes: 10

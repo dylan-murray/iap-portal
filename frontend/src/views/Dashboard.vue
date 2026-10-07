@@ -167,9 +167,9 @@ onMounted(async () => {
         <div class="flex gap-4">
           <div class="skeleton w-12 h-12 rounded-xl" />
           <div class="flex-1 space-y-2">
-            <div class="skeleton h-4 rounded w-2/3" />
-            <div class="skeleton h-3 rounded w-full" />
-            <div class="skeleton h-3 rounded w-1/2" />
+            <div class="skeleton h-4 rounded-sm w-2/3" />
+            <div class="skeleton h-3 rounded-sm w-full" />
+            <div class="skeleton h-3 rounded-sm w-1/2" />
           </div>
         </div>
       </div>
@@ -269,7 +269,7 @@ onMounted(async () => {
         <li
           v-for="r in myRequests"
           :key="r.id"
-          class="flex items-center justify-between rounded-lg bg-white/[0.03] px-4 py-2.5 ring-1 ring-white/5 text-sm"
+          class="flex items-center justify-between rounded-lg bg-white/3 px-4 py-2.5 ring-1 ring-white/5 text-sm"
         >
           <div class="flex items-center gap-3 min-w-0">
             <span
@@ -366,7 +366,7 @@ onMounted(async () => {
     <!-- Request modal -->
     <div
       v-if="requestTarget"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
       @click.self="cancelRequest"
     >
       <div class="glass-strong rounded-2xl p-6 max-w-md w-full">
@@ -381,7 +381,7 @@ onMounted(async () => {
           v-model="requestReason"
           rows="3"
           placeholder="What do you need it for?"
-          class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition resize-none mb-4"
+          class="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/30 transition resize-none mb-4"
         />
         <div
           v-if="requestError"
