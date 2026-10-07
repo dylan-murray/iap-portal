@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/dylan-murray/iap-portal/security/advisories/new
+    about: Keep vulnerabilities and credentials out of public issues.
