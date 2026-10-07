@@ -1,0 +1,15 @@
+.git
+.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.dev-keys
+**/*.pem
+**/*.key
+**/.env
+**/.env.*
+frontend/dist
+.claude
+
+# Local internal notes and review evidence
+/.internal/

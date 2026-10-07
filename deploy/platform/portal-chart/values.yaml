@@ -1,0 +1,67 @@
+image:
+  repository: ""
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+  pullSecret: ""
+replicas: 1
+portal:
+  # Visible brand name in the header, sign-in page, and browser titles.
+  displayName: iap-portal
+  baseUrl: https://portal.apps.example.com
+  # Parent domain of app hosts; empty derives it from baseUrl (apps.example.com).
+  appsDomain: ""
+  adminEmails: ""
+  # Enable one or both providers explicitly; production needs at least one.
+  auth:
+    okta:
+      enabled: false
+      issuer: "" # https://YOUR_TENANT.okta.com/oauth2/default
+      clientId: ""
+      # Existing Secret in the portal namespace; may also be portal.existingSecret.
+      clientSecretRef:
+        name: ""
+        key: client-secret
+    google:
+      enabled: false
+      clientId: ""
+      clientSecretRef:
+        name: ""
+        key: client-secret
+  # Sign-in admission; empty lists admit any verified email from configured IdPs.
+  allowedEmailDomains: []
+  googleHostedDomains: []
+  linkVerifiedEmailAcrossIssuers: false
+  # Proxies appending X-Forwarded-For before the portal (the gateway = 1).
+  trustedProxyHops: 1
+  # Contains PORTAL_DATABASE_URL, PORTAL_SESSION_SECRET, and optionally
+  # PORTAL_ADMIN_API_TOKEN (operator credential). OAuth secrets use the refs above.
+  existingSecret: portal-config
+  jwtSecret: portal-jwt-keys
+  jwtKid: portal-v1
+  # Optional Secret of <kid>.pem public keys published during key rotation.
+  jwtPreviousKeysSecret: ""
+# App registration Jobs authenticate with projected ServiceAccount tokens that
+# the portal validates with TokenReview (needs system:auth-delegator).
+kubernetesRegistration:
+  enabled: true
+  audience: iap-portal
+  appNamespacePrefix: iap-app-
+  serviceAccountName: iap-portal-registration
+serviceAccount:
+  name: iap-portal
+# HTTPRoute for the portal host on the shared gateway. The portal Service
+# (public 8090 and private authorization 8091) is owned by this chart only.
+httpRoute:
+  enabled: true
+  hostname: portal.apps.example.com
+  gateway:
+    name: iap-apps-gateway
+    namespace: iap-gateway
+    sectionName: https
+resources:
+  requests: {cpu: 100m, memory: 256Mi}
+  limits: {cpu: "1", memory: 512Mi}
+
+# Must match the actual ingress gateway ServiceAccount and mesh trust domain.
+authorization:
+  gatewayPrincipal: cluster.local/ns/iap-gateway/sa/iap-apps-gateway-istio

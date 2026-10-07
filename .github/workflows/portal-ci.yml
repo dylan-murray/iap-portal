@@ -1,0 +1,42 @@
+name: portal-ci
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras --locked
+      - run: uv run pytest backend/tests sdk/tests tests -q
+      - run: uv run python scripts/check_portability.py
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm ci && npm run build
+  charts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint charts/iap-app --set slug=demo --set image.repository=example/demo
+      - run: helm lint deploy/platform/portal-chart --set image.repository=example/portal
+      - run: docker compose --profile full config --quiet
+      - run: bash scripts/package-charts.sh dist/charts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helm-charts
+          path: dist/charts/*.tgz
+          if-no-files-found: error

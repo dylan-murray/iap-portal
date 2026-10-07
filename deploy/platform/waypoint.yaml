@@ -1,0 +1,25 @@
+# Waypoint proxy for L7 policy enforcement at the gateway edge.
+# Needed because ambient ztunnel is L4-only; ext_authz is L7.
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: iap-apps-waypoint
+  namespace: iap-gateway
+  labels:
+    istio.io/waypoint-for: all
+spec:
+  gatewayClassName: istio-waypoint
+  listeners:
+    - name: mesh
+      port: 15008
+      protocol: HBONE
+---
+# Binds the waypoint to the whole iap-gateway namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iap-gateway
+  labels:
+    istio.io/dataplane-mode: ambient
+    istio.io/use-waypoint: iap-apps-waypoint

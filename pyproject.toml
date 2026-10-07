@@ -1,0 +1,34 @@
+# Root workspace for the iap-portal monorepo.
+# Managed by uv (https://docs.astral.sh/uv).
+#
+#   uv sync              # install everything (auto-creates .venv)
+#   uv run <cmd>         # run <cmd> in the workspace venv
+#   uv add <pkg>         # add a dep
+
+[project]
+name = "iap-portal-platform"
+version = "0.1.0"
+license = "Apache-2.0"
+description = "IAP Portal for internal applications monorepo"
+requires-python = ">=3.10"
+# Pull both members + their optional extras into the venv.
+dependencies = [
+    "iap-portal-server",
+    "iap-portal[fastapi,flask]",
+]
+
+[project.optional-dependencies]
+dev = [
+    "iap-portal-server[dev]",
+    "iap-portal[dev,fastapi,flask]",
+]
+
+[tool.uv.workspace]
+members = ["backend", "sdk"]
+
+[tool.uv.sources]
+iap-portal-server = { workspace = true }
+iap-portal = { workspace = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

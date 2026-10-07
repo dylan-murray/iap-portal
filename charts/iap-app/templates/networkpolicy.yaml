@@ -1,0 +1,62 @@
+# Defense-in-depth: only the shared gateway's pods may reach this app. Other
+# pods, including ones in the gateway namespace, cannot connect directly.
+# With Istio ambient, gateway traffic arrives over HBONE (port 15008), and
+# kubelet probes are SNATed to 169.254.7.127; both are allowed narrowly.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.slug }}-ingress
+  namespace: {{ include "iap-app.namespace" . }}
+  labels:
+    {{- include "iap-app.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.slug }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.gateway.namespace }}
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: {{ .Values.gateway.name }}
+      ports:
+        - port: {{ .Values.port }}
+          protocol: TCP
+        {{- if .Values.networkPolicy.ambient }}
+        - port: 15008
+          protocol: TCP
+        {{- end }}
+    {{- if .Values.networkPolicy.ambient }}
+    - from:
+        - ipBlock:
+            cidr: 169.254.7.127/32
+      ports:
+        - port: {{ .Values.port }}
+          protocol: TCP
+    {{- end }}
+{{- if .Values.mesh.authorizationPolicy }}
+---
+# Enforced by ztunnel (ambient) or the sidecar: only the gateway's mTLS
+# identity may open connections to the app. Plaintext or other workloads fail.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ .Values.slug }}-gateway-only
+  namespace: {{ include "iap-app.namespace" . }}
+  labels:
+    {{- include "iap-app.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.slug }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - {{ printf "%s/ns/%s/sa/%s" .Values.mesh.trustDomain .Values.gateway.namespace .Values.gateway.serviceAccount | quote }}
+{{- end }}

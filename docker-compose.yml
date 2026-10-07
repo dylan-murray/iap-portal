@@ -1,0 +1,138 @@
+# Local dev compose file with two profiles:
+#
+#   make portal-dev      → brings up only `db` and `mock-idp` (infra)
+#                          backend + frontend run NATIVELY with hot reload
+#
+#   docker compose --profile full up --build
+#                        → brings up EVERYTHING containerized:
+#                          db, mock-idp, portal, envoy, example apps
+#                          (used for exercising the full auth chain locally)
+#
+# Hostnames: we use *.iapportal.test pinned in /etc/hosts. `.test` is an
+# IETF-reserved TLD (RFC 6761) that's guaranteed never to resolve publicly,
+# and it's not on the Public Suffix List — so Chrome accepts
+# Host-only session cookies keep portal and app sessions separate.
+# `task dev:hosts` (auto-run by `task up:full`) bootstraps /etc/hosts for you.
+#
+# Host ports can be changed if they are taken, e.g.
+#   IAP_PORTAL_GATEWAY_PORT=28090 IAP_PORTAL_IDP_PORT=28081 IAP_PORTAL_DB_PORT=25433
+# The browser must use the same ports: http://portal.iapportal.test:28090.
+
+services:
+  db:
+    networks: [default, authorization-db]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: portal
+      POSTGRES_PASSWORD: portal
+      POSTGRES_DB: portal
+    # Host 5433 → container 5432, to dodge brew-postgres on :5432.
+    ports: ["127.0.0.1:${IAP_PORTAL_DB_PORT:-5433}:5432"]
+    volumes: ["portal-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "portal"]
+      interval: 2s
+
+  mock-idp:
+    # Tiny Python-based OIDC mock — native on any arch (soluto's .NET image
+    # crashes under qemu on Apple Silicon). Source: dev/mock-idp/main.py.
+    build: ./dev/mock-idp
+    # Browser and portal use the same issuer URL, so the container listens on
+    # the published port.
+    ports: ["127.0.0.1:${IAP_PORTAL_IDP_PORT:-8081}:${IAP_PORTAL_IDP_PORT:-8081}"]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${IAP_PORTAL_IDP_PORT:-8081}"]
+    networks:
+      default:
+        aliases: [mock-idp.iapportal.test]
+    environment:
+      MOCK_IDP_ISSUER: http://mock-idp.iapportal.test:${IAP_PORTAL_IDP_PORT:-8081}
+      USERS_CONFIGURATION_INLINE: |
+        [
+          {"SubjectId":"u1","Username":"alice","Password":"x","Claims":[
+            {"Type":"email","Value":"alice@example.com"},
+            {"Type":"name","Value":"Alice"}]},
+          {"SubjectId":"u2","Username":"bob","Password":"x","Claims":[
+            {"Type":"email","Value":"bob@example.com"},
+            {"Type":"name","Value":"Bob"}]}
+        ]
+
+  portal:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      # dev: plain HTTP on *.test hostnames. Development-only values below.
+      PORTAL_ENV: dev
+      PORTAL_DISPLAY_NAME: ${PORTAL_DISPLAY_NAME:-iap-portal}
+      PORTAL_PORTAL_BASE_URL: http://portal.iapportal.test:${IAP_PORTAL_GATEWAY_PORT:-8090}
+      PORTAL_DATABASE_URL: postgresql+asyncpg://portal:portal@db/portal
+      PORTAL_SESSION_SECRET: dev-secret-change-me-to-something-32chars
+      PORTAL_OKTA_ISSUER: http://mock-idp.iapportal.test:${IAP_PORTAL_IDP_PORT:-8081}
+      PORTAL_OKTA_CLIENT_ID: portal-local
+      PORTAL_OKTA_CLIENT_SECRET: secret
+      # Admin list — source of truth is this env var. No UI/API mutates it.
+      PORTAL_ADMIN_EMAILS: alice@example.com
+      # Operator credential for the local CLI (`iap-portal apply`). In
+      # Kubernetes, apps register with workload identity instead.
+      PORTAL_ADMIN_API_TOKEN: dev-admin-token-change-me-in-prod
+      # JWT keys for minting per-app tokens. Mounted from host `.dev-keys/` below.
+      # In prod these come from k8s secrets mounted at a similar path.
+      PORTAL_JWT_PRIVATE_KEY_PEM_FILE: /app/.dev-keys/private.pem
+      PORTAL_JWT_PUBLIC_KEY_PEM_FILE: /app/.dev-keys/public.pem
+    volumes:
+      - ./backend/.dev-keys:/app/.dev-keys:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      mock-idp:
+        condition: service_started
+
+  authorization:
+    extends:
+      service: portal
+    command: [uvicorn, "iap_portal_server.main:create_authorization_app", "--factory", "--host", "0.0.0.0", "--port", "8091"]
+    networks: [authorization, authorization-db]
+
+  envoy:
+    networks: [default, authorization]
+    profiles: [full]
+    image: envoyproxy/envoy:v1.31-latest
+    command: ["-c", "/etc/envoy/envoy.yaml"]
+    volumes:
+      - ./dev/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports: ["127.0.0.1:${IAP_PORTAL_GATEWAY_PORT:-8090}:8090"]
+    depends_on: [portal, authorization]
+
+  streamlit-example:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: examples/streamlit-app/Dockerfile
+    environment:
+      IAP_PORTAL_APP_SLUG: streamlit-example
+      IAP_PORTAL_ISSUER: http://portal.iapportal.test:${IAP_PORTAL_GATEWAY_PORT:-8090}
+      IAP_PORTAL_JWKS_URL: http://portal:8090/.well-known/jwks.json
+      IAP_PORTAL_VERIFY_JWT: "true"
+
+  fastapi-sse:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: examples/fastapi-sse/Dockerfile
+    environment:
+      IAP_PORTAL_APP_SLUG: fastapi-sse
+      IAP_PORTAL_ISSUER: http://portal.iapportal.test:${IAP_PORTAL_GATEWAY_PORT:-8090}
+      IAP_PORTAL_JWKS_URL: http://portal:8090/.well-known/jwks.json
+      IAP_PORTAL_VERIFY_JWT: "true"
+
+volumes:
+  portal-db:
+
+# Only Envoy and the authorization service share the authorization network.
+# Database connectivity uses a separate network without app or gateway members.
+networks:
+  authorization:
+    internal: true
+  authorization-db:
+    internal: true

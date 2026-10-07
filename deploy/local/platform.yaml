@@ -1,0 +1,144 @@
+# Local-only variant of deploy/platform/*.yaml for minikube.
+# Differences vs. prod:
+#   - HTTP listener on port 80 (no cert-manager, no DNS-01)
+#   - Hostnames are *.iapportal.test (see memory: dev_hostnames)
+#   - Mock IdP host excluded from ext_authz; route admission for *.iapportal.test
+#   Otherwise the same boundary as production: CUSTOM auth for every host except
+#   the portal, internal portal paths denied, HTTPRoute-only listener.
+#
+# Apply:   kubectl apply -f deploy/local/platform.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iap-portal
+  labels:
+    istio.io/dataplane-mode: ambient
+    iap-apps/routable: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iap-gateway
+  labels:
+    istio.io/dataplane-mode: ambient
+    istio.io/use-waypoint: iap-apps-waypoint
+---
+# L7 waypoint: ambient ztunnel is L4-only, ext_authz needs L7.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: iap-apps-waypoint
+  namespace: iap-gateway
+  labels:
+    istio.io/waypoint-for: all
+spec:
+  gatewayClassName: istio-waypoint
+  listeners:
+    - name: mesh
+      port: 15008
+      protocol: HBONE
+---
+# Shared ingress gateway. HTTP only in local; HTTPS in prod.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: iap-apps-gateway
+  namespace: iap-gateway
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.iapportal.test"
+      allowedRoutes:
+        kinds:
+          - kind: HTTPRoute
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              iap-apps/routable: "true"
+---
+# AuthorizationPolicy CUSTOM → delegate to portal's /auth/verify for every
+# host except the portal and the local-only mock IdP. /auth/verify denies the
+# portal host and unknown hosts, so a spelling that escapes notHosts fails
+# closed. Do not add an ALLOW policy on this gateway (CUSTOM and ALLOW would
+# then both have to allow).
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: require-portal-auth
+  namespace: iap-gateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: iap-apps-gateway
+  action: CUSTOM
+  provider:
+    name: iap-portal-ext-authz
+  rules:
+    - to:
+        - operation:
+            notHosts:
+              - "portal.iapportal.test"
+              - "portal.iapportal.test:80"
+              - "mock-idp.iapportal.test"
+              - "mock-idp.iapportal.test:80"
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-portal-internal-paths
+  namespace: iap-gateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: iap-apps-gateway
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            hosts: ["portal.iapportal.test", "portal.iapportal.test:80"]
+            paths: ["/auth/verify", "/auth/verify/*"]
+            # Scope to the HTTP listener port so the rule is not applied to TCP traffic.
+            ports: ["80"]
+---
+# HTTPRoute for the portal UI + API.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: portal
+  namespace: iap-portal
+spec:
+  parentRefs:
+    - name: iap-apps-gateway
+      namespace: iap-gateway
+      sectionName: http
+  hostnames:
+    - portal.iapportal.test
+  rules:
+    - backendRefs:
+        - name: portal
+          port: 8090
+---
+# HTTPRoute for the mock IdP (only in local).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mock-idp
+  namespace: iap-portal
+spec:
+  parentRefs:
+    - name: iap-apps-gateway
+      namespace: iap-gateway
+      sectionName: http
+  hostnames:
+    - mock-idp.iapportal.test
+  rules:
+    - backendRefs:
+        - name: mock-idp
+          port: 80

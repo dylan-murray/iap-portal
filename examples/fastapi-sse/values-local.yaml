@@ -1,0 +1,12 @@
+slug: fastapi-sse
+displayName: FastAPI SSE
+port: 8090
+
+image:
+  repository: iap-portal/fastapi-sse
+
+healthCheck:
+  path: /healthz
+
+registration:
+  owners: [alice@example.com]

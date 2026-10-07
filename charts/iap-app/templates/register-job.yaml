@@ -1,0 +1,89 @@
+{{- if .Values.registration.enabled }}
+# Post-install/upgrade Job that registers this app with the portal. Idempotent.
+# It authenticates with a short-lived projected ServiceAccount token (audience
+# {{ .Values.registration.audience }}); the portal verifies it with TokenReview and
+# only allows it to create or update the app for this namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.registration.serviceAccountName }}
+  namespace: {{ include "iap-app.namespace" . }}
+  labels:
+    {{- include "iap-app.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.slug }}-register
+  namespace: {{ include "iap-app.namespace" . }}
+  labels:
+    {{- include "iap-app.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "iap-app.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Values.registration.serviceAccountName }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: register
+          image: {{ .Values.registration.image | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          command: ["python", "-c"]
+          args:
+            - |
+              import json, urllib.error, urllib.request
+              token = open("/var/run/secrets/iap-portal/token").read().strip()
+              base = {{ .Values.registration.portalUrl | quote }}.rstrip("/")
+              body = json.dumps({
+                "slug": {{ .Values.slug | quote }},
+                "display_name": {{ include "iap-app.displayName" . | quote }},
+                "description": {{ .Values.description | quote }},
+                "icon_url": {{ .Values.registration.iconUrl | quote }},
+                "upstream_service": {{ include "iap-app.upstreamService" . | quote }},
+                "upstream_port": {{ .Values.port }},
+                "health_check_path": {{ .Values.healthCheck.path | quote }},
+                "owners": {{ .Values.registration.owners | toJson }},
+              }).encode()
+              headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
+              def call(method, path):
+                  req = urllib.request.Request(base + path, data=body, headers=headers, method=method)
+                  return urllib.request.urlopen(req, timeout=10)
+              try:
+                  call("POST", "/api/apps")
+                  print("registered")
+              except urllib.error.HTTPError as e:
+                  if e.code != 409:
+                      raise SystemExit(f"registration failed: {e.code} {e.read()[:200]!r}")
+                  call("PUT", "/api/apps/{{ .Values.slug }}")
+                  print("updated")
+          volumeMounts:
+            - name: portal-token
+              mountPath: /var/run/secrets/iap-portal
+              readOnly: true
+      volumes:
+        - name: portal-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: {{ .Values.registration.audience | quote }}
+                  expirationSeconds: 600
+{{- end }}

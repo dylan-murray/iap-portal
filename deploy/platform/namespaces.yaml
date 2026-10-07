@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iap-portal
+  labels:
+    iap-apps/routable: "true"
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iap-gateway
+  labels:
+    istio.io/dataplane-mode: ambient

@@ -1,0 +1,124 @@
+# Local Envoy config mirroring the production Istio gateway boundary:
+#   - ext_authz runs for every host except the portal (Istio: CUSTOM policy with
+#     notHosts: [portal host]); unknown hosts are denied by /auth/verify.
+#   - The check request carries the original Host (authority) and path; no
+#     X-Forwarded-Host. Headers match meshConfig includeRequestHeadersInCheck.
+#   - Identity headers, Authorization, and Cookie are replaced on allow; the
+#     portal removes portal cookies and empty identity headers.
+#   - Envoy is the edge (use_remote_address), so X-Forwarded-For has exactly one
+#     trusted hop, as with the Istio gateway (PORTAL_TRUSTED_PROXY_HOPS=1).
+#   - Like Istio, virtual hosts match "host" and "host:*" and keep the Host header
+#     unchanged (apps such as Streamlit compare it with Origin).
+
+static_resources:
+  listeners:
+    - name: listener_0
+      address: { socket_address: { address: 0.0.0.0, port_value: 8090 } }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                codec_type: AUTO
+                use_remote_address: true
+                upgrade_configs: [{ upgrade_type: websocket }]
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: portal
+                      domains: ["portal.iapportal.test", "portal.iapportal.test:*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route: { cluster: portal, timeout: 0s }
+                          typed_per_filter_config:
+                            envoy.filters.http.ext_authz:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+                              disabled: true
+                    - name: streamlit
+                      domains: ["streamlit-example.iapportal.test", "streamlit-example.iapportal.test:*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route: { cluster: streamlit-example, timeout: 0s }
+                    - name: fastapi
+                      domains: ["fastapi-sse.iapportal.test", "fastapi-sse.iapportal.test:*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route: { cluster: fastapi-sse, timeout: 0s }
+                    - name: unknown
+                      domains: ["*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          direct_response: { status: 404 }
+                http_filters:
+                  - name: envoy.filters.http.ext_authz
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+                      http_service:
+                        server_uri:
+                          uri: http://authorization:8091
+                          cluster: authorization
+                          timeout: 2s
+                        path_prefix: /auth/verify
+                        authorization_request:
+                          allowed_headers:
+                            patterns:
+                              - exact: cookie
+                              - exact: origin
+                              - exact: x-forwarded-for
+                              - exact: user-agent
+                        authorization_response:
+                          allowed_upstream_headers:
+                            patterns:
+                              - exact: x-forwarded-email
+                              - exact: x-forwarded-user
+                              - exact: x-forwarded-name
+                              - exact: x-forwarded-groups
+                              - exact: x-iap-portal-app
+                              - exact: authorization
+                              - exact: cookie
+                          allowed_client_headers:
+                            patterns:
+                              - exact: location
+                              - exact: set-cookie
+                              - exact: content-type
+                              - exact: cache-control
+                      failure_mode_allow: false
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: portal
+      type: STRICT_DNS
+      load_assignment:
+        cluster_name: portal
+        endpoints:
+          - lb_endpoints:
+              - endpoint: { address: { socket_address: { address: portal, port_value: 8090 } } }
+    - name: streamlit-example
+      type: STRICT_DNS
+      load_assignment:
+        cluster_name: streamlit-example
+        endpoints:
+          - lb_endpoints:
+              - endpoint: { address: { socket_address: { address: streamlit-example, port_value: 8090 } } }
+    - name: fastapi-sse
+      type: STRICT_DNS
+      load_assignment:
+        cluster_name: fastapi-sse
+        endpoints:
+          - lb_endpoints:
+              - endpoint: { address: { socket_address: { address: fastapi-sse, port_value: 8090 } } }
+
+    - name: authorization
+      type: STRICT_DNS
+      load_assignment:
+        cluster_name: authorization
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: authorization
+                      port_value: 8091

@@ -1,0 +1,48 @@
+# Patches Istio MeshConfig to register the portal as an ext_authz provider.
+# Applied by an IstioOperator, `istioctl install`, or `kubectl edit istio/controlplane`
+# depending on how Istio was installed in your cluster.
+#
+# Reference this extension provider by name (`iap-portal-ext-authz`) in the
+# AuthorizationPolicy at auth-policy.yaml.
+#
+# The check request always carries the original Host (authority), method, and
+# path (appended to pathPrefix). /auth/verify trusts only those plus the headers
+# listed here; never add x-forwarded-host or x-forwarded-proto.
+# `headersToUpstreamOnAllow` overwrites identity headers, Authorization, and
+# Cookie on the upstream request; the portal additionally asks Envoy to remove
+# empty identity headers and portal cookies (x-envoy-auth-headers-to-remove).
+# `headersToDownstreamOnDeny` carries sign-in redirects and app session cookies.
+
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: controlplane
+spec:
+  meshConfig:
+    extensionProviders:
+      - name: iap-portal-ext-authz
+        envoyExtAuthzHttp:
+          service: portal.iap-portal.svc.cluster.local
+          # Dedicated listener; the portal L4 policy requires the gateway identity.
+          port: 8091
+          timeout: 2s
+          pathPrefix: /auth/verify
+          # failOpen defaults to false: portal errors or timeouts deny access.
+          includeRequestHeadersInCheck:
+            - cookie
+            - origin
+            - x-forwarded-for
+            - user-agent
+          headersToDownstreamOnDeny:
+            - location
+            - set-cookie
+            - content-type
+            - cache-control
+          headersToUpstreamOnAllow:
+            - x-forwarded-email
+            - x-forwarded-user
+            - x-forwarded-name
+            - x-forwarded-groups
+            - x-iap-portal-app
+            - authorization
+            - cookie

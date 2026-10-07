@@ -1,0 +1,207 @@
+# Portal + mock-idp + postgres, deployed straight to minikube (no Helm chart).
+# Secrets (session secret, JWT keypair, operator token) are created by the
+# bootstrap script before this manifest is applied — see scripts/k8s/seed-secrets.sh.
+# Development-only credentials; the portal runs with PORTAL_ENV=dev over HTTP.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: iap-portal
+  namespace: iap-portal
+---
+# TokenReview for app registration Jobs (Kubernetes workload identity).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: iap-portal-iap-portal-token-review
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: iap-portal
+    namespace: iap-portal
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: iap-portal
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - { name: POSTGRES_USER,     value: portal }
+            - { name: POSTGRES_PASSWORD, value: portal }
+            - { name: POSTGRES_DB,       value: portal }
+          ports: [{ name: pg, containerPort: 5432 }]
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "portal"] }
+            periodSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: iap-portal
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 5432, targetPort: pg }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-idp
+  namespace: iap-portal
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mock-idp } }
+  template:
+    metadata:
+      labels: { app: mock-idp }
+    spec:
+      containers:
+        - name: mock-idp
+          image: iap-portal/mock-idp:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: MOCK_IDP_ISSUER, value: "http://mock-idp.iapportal.test" }
+            - name: USERS_CONFIGURATION_INLINE
+              value: |
+                [
+                  {"SubjectId":"u1","Username":"alice","Password":"x","Claims":[
+                    {"Type":"email","Value":"alice@example.com"},
+                    {"Type":"name","Value":"Alice"}]},
+                  {"SubjectId":"u2","Username":"bob","Password":"x","Claims":[
+                    {"Type":"email","Value":"bob@example.com"},
+                    {"Type":"name","Value":"Bob"}]}
+                ]
+          ports: [{ name: http, containerPort: 80 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-idp
+  namespace: iap-portal
+spec:
+  selector: { app: mock-idp }
+  ports: [{ port: 80, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+  namespace: iap-portal
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: portal } }
+  template:
+    metadata:
+      labels: { app: portal }
+    spec:
+      serviceAccountName: iap-portal
+      containers:
+        - name: portal
+          image: iap-portal/portal:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: PORTAL_ENV,             value: dev }
+            - { name: PORTAL_PORTAL_BASE_URL, value: "http://portal.iapportal.test" }
+            - { name: PORTAL_KUBERNETES_REGISTRATION_ENABLED, value: "true" }
+            - { name: PORTAL_DATABASE_URL,    value: "postgresql+asyncpg://portal:portal@postgres/portal" }
+            - { name: PORTAL_OKTA_ISSUER,     value: "http://mock-idp.iapportal.test" }
+            - { name: PORTAL_OKTA_CLIENT_ID,  value: "portal-local" }
+            - { name: PORTAL_OKTA_CLIENT_SECRET, value: "secret" }
+            - { name: PORTAL_ADMIN_EMAILS, value: "alice@example.com" }
+            - { name: PORTAL_JWT_KID,         value: "dev-v1" }
+            - name: PORTAL_SESSION_SECRET
+              valueFrom: { secretKeyRef: { name: portal-session, key: secret } }
+            - name: PORTAL_JWT_PRIVATE_KEY_PEM
+              valueFrom: { secretKeyRef: { name: portal-jwt-keys, key: private.pem } }
+            - name: PORTAL_JWT_PUBLIC_KEY_PEM
+              valueFrom: { secretKeyRef: { name: portal-jwt-keys, key: public.pem } }
+            # Operator credential for the local CLI only; not copied to app namespaces.
+            - name: PORTAL_ADMIN_API_TOKEN
+              valueFrom: { secretKeyRef: { name: portal-admin-token, key: token } }
+          ports: [{ name: http, containerPort: 8090 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+        - name: authorization
+          image: iap-portal/portal:local
+          imagePullPolicy: IfNotPresent
+          command: [uvicorn]
+          args: ["iap_portal_server.main:create_authorization_app", "--factory", "--host", "0.0.0.0", "--port", "8091"]
+          env:
+            - { name: PORTAL_ENV,             value: dev }
+            - { name: PORTAL_PORTAL_BASE_URL, value: "http://portal.iapportal.test" }
+            - { name: PORTAL_KUBERNETES_REGISTRATION_ENABLED, value: "true" }
+            - { name: PORTAL_DATABASE_URL,    value: "postgresql+asyncpg://portal:portal@postgres/portal" }
+            - { name: PORTAL_OKTA_ISSUER,     value: "http://mock-idp.iapportal.test" }
+            - { name: PORTAL_OKTA_CLIENT_ID,  value: "portal-local" }
+            - { name: PORTAL_OKTA_CLIENT_SECRET, value: "secret" }
+            - { name: PORTAL_ADMIN_EMAILS, value: "alice@example.com" }
+            - { name: PORTAL_JWT_KID,         value: "dev-v1" }
+            - name: PORTAL_SESSION_SECRET
+              valueFrom: { secretKeyRef: { name: portal-session, key: secret } }
+            - name: PORTAL_JWT_PRIVATE_KEY_PEM
+              valueFrom: { secretKeyRef: { name: portal-jwt-keys, key: private.pem } }
+            - name: PORTAL_JWT_PUBLIC_KEY_PEM
+              valueFrom: { secretKeyRef: { name: portal-jwt-keys, key: public.pem } }
+            # Operator credential for the local CLI only; not copied to app namespaces.
+            - name: PORTAL_ADMIN_API_TOKEN
+              valueFrom: { secretKeyRef: { name: portal-admin-token, key: token } }
+          ports: [{ name: http-auth, containerPort: 8091 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: http-auth }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http-auth }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal
+  namespace: iap-portal
+spec:
+  selector: { app: portal }
+  ports:
+    - { name: http, port: 8090, targetPort: http }
+    - { name: http-auth, port: 8091, targetPort: http-auth }
+
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: portal-listeners
+  namespace: iap-portal
+spec:
+  selector:
+    matchLabels: {app: portal}
+  action: ALLOW
+  rules:
+    - to:
+        - operation:
+            ports: ["8090"]
+    - from:
+        - source:
+            principals: ["cluster.local/ns/iap-gateway/sa/iap-apps-gateway-istio"]
+      to:
+        - operation:
+            ports: ["8091"]

@@ -1,0 +1,90 @@
+name: deploy-iap-app
+
+on:
+  workflow_call:
+    inputs:
+      app-slug:
+        type: string
+        required: true
+      platform-repository:
+        description: Repository containing IAP Portal and charts/iap-app
+        type: string
+        required: true
+      platform-ref:
+        type: string
+        default: main
+      registry:
+        type: string
+        default: ghcr.io
+      image-repository:
+        description: Full image repository without tag
+        type: string
+        required: true
+      base-image:
+        description: Published framework base image built from this platform checkout
+        type: string
+        required: true
+      helm-values-file:
+        type: string
+        default: iap-app.yaml
+      runner:
+        description: JSON runner labels; use self-hosted labels for private clusters
+        type: string
+        default: '["ubuntu-latest"]'
+    secrets:
+      REGISTRY_USERNAME:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+      KUBECONFIG:
+        description: Raw kubeconfig with permission to deploy in the prepared app namespace
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    env:
+      APP_SLUG: ${{ inputs.app-slug }}
+      IMAGE_REPOSITORY: ${{ inputs.image-repository }}
+      VALUES_FILE: ${{ inputs.helm-values-file }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.platform-repository }}
+          ref: ${{ inputs.platform-ref }}
+          path: .iap-platform
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: BASE_IMAGE=${{ inputs.base-image }}
+          tags: ${{ inputs.image-repository }}:${{ github.sha }}
+      - uses: azure/setup-helm@v4
+      - uses: azure/setup-kubectl@v4
+      - name: Deploy to prepared namespace
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBECONFIG }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export KUBECONFIG="$RUNNER_TEMP/iap-kubeconfig"
+          trap 'rm -f "$KUBECONFIG"' EXIT
+          umask 077
+          printf '%s' "$KUBE_CONFIG" > "$KUBECONFIG"
+          helm upgrade --install "$APP_SLUG" .iap-platform/charts/iap-app \
+            --namespace "iap-app-$APP_SLUG" \
+            --values "$VALUES_FILE" \
+            --set-string slug="$APP_SLUG" \
+            --set-string image.repository="$IMAGE_REPOSITORY" \
+            --set-string image.tag="$GITHUB_SHA" \
+            --wait --timeout 10m

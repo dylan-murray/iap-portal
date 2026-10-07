@@ -1,0 +1,14 @@
+slug: streamlit-example
+displayName: Streamlit Example
+description: Demo Streamlit app — validates subdomain routing, WebSocket, and auth.
+port: 8090
+
+framework: streamlit
+entrypoint: app.py
+
+registration:
+  owners:
+    - alice@example.com
+
+healthCheck:
+  path: /_stcore/health

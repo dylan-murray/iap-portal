@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""iap-app-start — the single entrypoint shared by every base image.
+
+Reads iap-app.yaml (or env) and launches the declared framework with the correct
+production flags. Because the platform uses subdomain routing, we DO NOT set
+base-path flags — apps run at `/` as far as they know.
+
+The point of this script is to remove Docker/entrypoint boilerplate from app
+developers. They declare `framework: streamlit` in iap-app.yaml and this script
+does the right thing without them thinking about it.
+"""
+
+from __future__ import annotations
+
+import os
+import pathlib
+import sys
+from typing import Any
+
+try:
+    import yaml  # pyyaml is in every base image
+except ImportError:
+    yaml = None  # type: ignore
+
+
+def load_spec() -> dict[str, Any]:
+    path = pathlib.Path(os.environ.get("IAP_APP_SPEC", "/app/iap-app.yaml"))
+    if yaml and path.exists():
+        return yaml.safe_load(path.read_text()) or {}
+    return {}
+
+
+def detect_framework(spec: dict) -> str:
+    f = os.environ.get("IAP_APP_FRAMEWORK") or spec.get("framework")
+    if f:
+        return f
+    # Auto-detect from installed packages.
+    for mod, name in [
+        ("streamlit", "streamlit"),
+        ("gradio", "gradio"),
+        ("fastapi", "fastapi"),
+        ("flask", "flask"),
+    ]:
+        try:
+            __import__(mod)
+            return name
+        except ImportError:
+            continue
+    sys.exit("iap-app-start: could not detect framework; set `framework:` in iap-app.yaml")
+
+
+def port() -> str:
+    return os.environ.get("PORT", "8080")
+
+
+def run_streamlit(spec: dict) -> None:
+    entry = spec.get("entrypoint", "app.py")
+    os.execvp(
+        "streamlit",
+        [
+            "streamlit", "run", entry,
+            "--server.address=0.0.0.0",
+            f"--server.port={port()}",
+            "--server.headless=true",
+            "--browser.gatherUsageStats=false",
+        ],
+    )
+
+
+def run_gradio(spec: dict) -> None:
+    entry = spec.get("entrypoint", "app.py")
+    os.environ.setdefault("GRADIO_SERVER_NAME", "0.0.0.0")
+    os.environ.setdefault("GRADIO_SERVER_PORT", port())
+    os.execvp(sys.executable, [sys.executable, entry])
+
+
+def run_fastapi(spec: dict) -> None:
+    entry = spec.get("entrypoint", "app:app")
+    workers = str(spec.get("workers", os.environ.get("WEB_WORKERS", "2")))
+    os.execvp(
+        "gunicorn",
+        [
+            "gunicorn", entry,
+            "-k", "uvicorn.workers.UvicornWorker",
+            f"--bind=0.0.0.0:{port()}",
+            f"--workers={workers}",
+            "--access-logfile=-",
+            "--error-logfile=-",
+        ],
+    )
+
+
+def run_flask(spec: dict) -> None:
+    entry = spec.get("entrypoint", "app:app")
+    workers = str(spec.get("workers", os.environ.get("WEB_WORKERS", "2")))
+    os.execvp(
+        "gunicorn",
+        [
+            "gunicorn", entry,
+            f"--bind=0.0.0.0:{port()}",
+            f"--workers={workers}",
+            "--access-logfile=-",
+            "--error-logfile=-",
+        ],
+    )
+
+
+RUNNERS = {
+    "streamlit": run_streamlit,
+    "gradio": run_gradio,
+    "fastapi": run_fastapi,
+    "flask": run_flask,
+}
+
+
+def main() -> None:
+    spec = load_spec()
+    framework = detect_framework(spec)
+    runner = RUNNERS.get(framework)
+    if runner is None:
+        sys.exit(f"iap-app-start: unsupported framework '{framework}'")
+    print(f"[iap-app-start] launching {framework} on :{port()}", flush=True)
+    runner(spec)
+
+
+if __name__ == "__main__":
+    main()

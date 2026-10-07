@@ -1,0 +1,98 @@
+# Binds gateway routes to app identity. Requires Kubernetes 1.30+
+# (admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy; no extra software).
+#
+# In every namespace labeled iap-apps/routable=true except the portal namespace:
+#   - the namespace must be named iap-app-<slug> (slug != portal),
+#   - every Gateway API route must list hostnames, and each must be exactly
+#     <slug>.iapportal.test.
+# So an app deployer cannot route another app's hostname, the portal hostname,
+# or a hostname-less catch-all to their own pods.
+#
+# The binding uses the namespace *name*, which is immutable and created by the
+# platform operator. Namespace labels are also operator-controlled: app deployers
+# need only namespaced Roles in their own iap-app-<slug> namespace, never rights to
+# create namespaces, edit Namespace objects, or write in iap-portal/iap-gateway.
+#
+# Local copy of deploy/platform/route-admission-policy.yaml for *.iapportal.test.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: iap-portal-route-hostnames
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        iap-apps/routable: "true"
+    resourceRules:
+      - apiGroups: ["gateway.networking.k8s.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["httproutes", "grpcroutes", "tlsroutes", "tcproutes", "udproutes"]
+  matchConditions:
+    - name: not-portal-namespace
+      expression: "request.namespace != 'iap-portal'"
+  variables:
+    - name: domain
+      expression: "'iapportal.test'"
+    - name: prefix
+      expression: "'iap-app-'"
+    - name: slug
+      expression: >-
+        request.namespace.startsWith(variables.prefix)
+        ? request.namespace.substring(size(variables.prefix)) : ''
+    - name: hostnames
+      expression: "has(object.spec.hostnames) ? object.spec.hostnames : []"
+  validations:
+    - expression: "variables.slug != '' && variables.slug != 'portal'"
+      message: "Routable namespaces other than iap-portal must be named iap-app-<slug>."
+      reason: Forbidden
+    - expression: "size(variables.hostnames) > 0"
+      message: "App routes must list their hostname explicitly."
+      reason: Forbidden
+    - expression: "variables.hostnames.all(h, h == variables.slug + '.' + variables.domain)"
+      messageExpression: "'Route hostnames in ' + request.namespace + ' must be exactly ' + variables.slug + '.' + variables.domain"
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: iap-portal-route-hostnames
+spec:
+  policyName: iap-portal-route-hostnames
+  validationActions: [Deny]
+---
+# Prevent an app deployer from routing its authorized hostname to another
+# namespace's service (or an external service) through a DNS alias. Backends
+# must be namespace-local services; app deployers cannot manage EndpointSlices
+# or ReferenceGrants either (see app-deployer-rbac.yaml).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: iap-portal-service-backends
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        iap-apps/routable: "true"
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [services]
+  matchConditions:
+    - name: not-portal-namespace
+      expression: "request.namespace != 'iap-portal'"
+  validations:
+    - expression: "!has(object.spec.type) || object.spec.type != 'ExternalName'"
+      message: "App backends must use namespace-local services; ExternalName aliases are not allowed."
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: iap-portal-service-backends
+spec:
+  policyName: iap-portal-service-backends
+  validationActions: [Deny]

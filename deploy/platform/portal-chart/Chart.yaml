@@ -1,0 +1,6 @@
+apiVersion: v2
+name: iap-portal
+version: 0.1.0
+appVersion: "0.1.0"
+description: IAP Portal control plane for teams using Kubernetes and Istio
+type: application

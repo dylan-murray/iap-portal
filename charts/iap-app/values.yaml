@@ -1,0 +1,107 @@
+# Default values for iap-app.
+# Apps override `slug`, `image`, and `secrets` — most other values are sensible defaults.
+
+slug: ""                              # REQUIRED — becomes <slug>.<domain>
+displayName: ""                       # defaults to slug
+description: ""
+domain: apps.example.com                   # override for non-prod (e.g. iapportal.test)
+port: 8090
+
+image:
+  repository: ""                      # e.g. ghcr.io/YOUR_ORG/apps/<slug>
+  tag: "latest"
+  pullPolicy: IfNotPresent
+  pullSecret: ""              # imagePullSecret in the app namespace
+
+# Subdomain routing attaches here. Usually leave as-is.
+gateway:
+  name: iap-apps-gateway
+  namespace: iap-gateway
+  # ServiceAccount of the gateway's Envoy pods (Istio names it <gateway>-istio).
+  serviceAccount: iap-apps-gateway-istio
+
+portal:
+  # Portal endpoint apps use for JWKS. In-cluster Service DNS by default — no
+  # TLS, no gateway round-trip. Override only if the portal lives elsewhere.
+  jwksUrl: http://portal.iap-portal.svc.cluster.local:8090/.well-known/jwks.json
+  # Expected JWT issuer: the portal's public URL. Empty = https://portal.<domain>.
+  issuer: ""
+  # Streamlit sessions keep the identity of their WebSocket handshake; users are
+  # asked to reload after this many seconds (which re-checks access).
+  maxConnectionAgeSeconds: 3600
+
+# Existing Kubernetes Secret in the app namespace; no secrets operator required.
+secrets:
+  existingSecret: ""
+  # Optional provider-neutral External Secrets integration.
+  external:
+    enabled: false
+    storeRef:
+      kind: ClusterSecretStore
+      name: ""
+    refreshInterval: "1h"
+    data: []
+    dataFrom: []
+
+# Portal auto-registration. A post-install/upgrade Job registers the app with a
+# short-lived projected ServiceAccount token (Kubernetes workload identity). The
+# portal only lets it create/update this app's own registry entry. No shared
+# credential is stored in the app namespace. Idempotent.
+registration:
+  enabled: true
+  portalUrl: http://portal.iap-portal.svc.cluster.local:8090
+  owners: []                          # emails
+  iconUrl: ""
+  image: python:3.12-slim             # pin by digest in production
+  audience: iap-portal                # must match the portal's token audience
+  serviceAccountName: iap-portal-registration
+
+healthCheck:
+  path: /healthz
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1
+    memory: 1Gi
+
+replicas: 1
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPU: 75
+
+env: {}                               # extra env vars (non-secret)
+extraEnvFrom: []                      # extra envFrom entries
+
+# Workload hardening. Framework base images run as uid 10001. Override for
+# images that need a different user; avoid running as root.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: false       # many frameworks write caches at runtime
+serviceAccount:
+  automountToken: false               # apps do not call the Kubernetes API
+
+# Only the gateway's pods may reach the app. With Istio ambient, gateway traffic
+# arrives as HBONE on 15008 and kubelet probes are SNATed to 169.254.7.127.
+networkPolicy:
+  ambient: true
+mesh:
+  # Istio L4 policy (ztunnel/sidecar): only the gateway's mTLS identity may
+  # connect. Requires Istio CRDs.
+  authorizationPolicy: true
+  trustDomain: cluster.local

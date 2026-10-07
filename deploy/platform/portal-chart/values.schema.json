@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "image": {
+      "type": "object",
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "replicas": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "portal": {
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "maxLength": 100
+        },
+        "baseUrl": {
+          "type": "string",
+          "pattern": "^https://[a-z0-9][a-z0-9.-]+(:443)?/?$"
+        },
+        "existingSecret": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "jwtSecret": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "trustedProxyHops": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "okta": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "clientId": {
+                  "type": "string"
+                },
+                "clientSecretRef": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "issuer": {
+                  "type": "string"
+                }
+              }
+            },
+            "google": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "clientId": {
+                  "type": "string"
+                },
+                "clientSecretRef": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "properties": {
+        "gatewayPrincipal": {
+          "type": "string",
+          "pattern": "^[a-z0-9.-]+/ns/[a-z0-9-]+/sa/[a-z0-9-]+$"
+        }
+      }
+    }
+  }
+}

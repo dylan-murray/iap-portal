@@ -1,0 +1,243 @@
+# Taskfile for iap-portal. Install:
+#   brew install go-task uv
+# Run `task` (no args) to see everything.
+
+version: '3'
+
+silent: true
+output: prefixed
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  # --------------------------------------------------------------------
+  # One command, everything running. Ctrl-C stops it all.
+  # --------------------------------------------------------------------
+  dev:
+    desc: "Boot the full dev loop: infra + backend + frontend in this terminal"
+    deps: ["dev:backend", "dev:frontend"]
+
+  "dev:setup":
+    desc: "uv sync (venv + deps) and npm install"
+    run: once
+    cmds:
+      - uv sync --all-extras --quiet
+      - |
+        if [ ! -d frontend/node_modules ]; then
+          (cd frontend && npm install)
+        fi
+
+  "dev:infra":
+    desc: "Bring up postgres (waits for healthy) + mock-idp (async)"
+    run: once
+    cmds:
+      - docker compose up -d --wait db
+      - docker compose up -d --no-recreate mock-idp
+
+  "dev:keys":
+    desc: "Generate dev RSA keypair for JWT signing (idempotent)"
+    run: once
+    deps: ["dev:setup"]
+    cmds:
+      - uv run --quiet python scripts/gen_dev_keys.py > /dev/null
+    status:
+      - test -f backend/.dev-keys/private.pem
+
+  "dev:hosts":
+    desc: "Pin *.iapportal.test → 127.0.0.1 in /etc/hosts (idempotent; uses sudo on first run)"
+    run: once
+    status:
+      - grep -q 'portal\.iapportal\.test' /etc/hosts
+    cmds:
+      - |
+        echo "Adding *.iapportal.test entries to /etc/hosts (sudo required; one-time)..."
+        echo '127.0.0.1 portal.iapportal.test streamlit-example.iapportal.test fastapi-sse.iapportal.test mock-idp.iapportal.test' \
+          | sudo tee -a /etc/hosts > /dev/null
+        echo "/etc/hosts updated."
+
+  "dev:backend":
+    desc: "FastAPI with --reload"
+    deps: ["dev:setup", "dev:infra", "dev:keys", "dev:hosts"]
+    dir: backend
+    cmds:
+      - |
+        set -a; . .env.dev; set +a
+        export PORTAL_JWT_PRIVATE_KEY_PEM="$(cat .dev-keys/private.pem)"
+        export PORTAL_JWT_PUBLIC_KEY_PEM="$(cat .dev-keys/public.pem)"
+        uv run uvicorn iap_portal_server.main:app --reload --host 0.0.0.0 --port 8088
+
+  "dev:frontend":
+    desc: "Vite dev server with HMR"
+    deps: ["dev:setup", "dev:infra"]
+    dir: frontend
+    cmds:
+      - npm run dev
+
+  # --------------------------------------------------------------------
+  # Full containerized stack (to exercise the real auth chain)
+  # --------------------------------------------------------------------
+  "up:full":
+    desc: "docker compose up with portal, envoy, example apps"
+    deps: ["dev:hosts", "dev:keys"]
+    cmds:
+      - docker compose --profile full up --build
+
+  down:
+    desc: "docker compose down -v --remove-orphans across all profiles"
+    cmds:
+      - docker compose --profile full down -v --remove-orphans
+
+  # --------------------------------------------------------------------
+  # Full minikube stack (exercise the real Istio + Helm + register-Job chain)
+  # --------------------------------------------------------------------
+  "k8s:up":
+    desc: "Start minikube + install Istio ambient + Gateway API CRDs"
+    cmds:
+      - scripts/k8s/bootstrap.sh
+
+  "k8s:images":
+    desc: "Build portal + mock-idp + example images and load them into minikube"
+    cmds:
+      - scripts/k8s/load-images.sh
+
+  "k8s:platform":
+    desc: "Apply MeshConfig ext_authz provider, namespaces, waypoint, gateway, auth policy"
+    cmds:
+      # Version-matched istioctl downloaded by scripts/k8s/bootstrap.sh (task k8s:up).
+      - |
+        "${XDG_CACHE_HOME:-$HOME/.cache}/iap-portal/istio-${ISTIO_VERSION:-1.31.1}/istioctl" \
+          --context "${MINIKUBE_PROFILE:-iap-portal}" install -y -f deploy/local/mesh-config-patch.yaml
+      - kubectl --context "${MINIKUBE_PROFILE:-iap-portal}" apply -f deploy/local/platform.yaml
+      - kubectl --context "${MINIKUBE_PROFILE:-iap-portal}" apply -f deploy/local/route-admission-policy.yaml
+      - kubectl --context "${MINIKUBE_PROFILE:-iap-portal}" -n iap-gateway rollout status deploy/iap-apps-waypoint --timeout=120s || true
+      # Portal pod needs *.iapportal.test to resolve to the gateway Service so
+      # OIDC discovery to mock-idp works from inside the cluster (see
+      # deploy/local/README.md for the gory details).
+      - scripts/k8s/coredns-patch.sh
+
+  "k8s:portal":
+    desc: "Seed secrets + deploy postgres, mock-idp, and the portal"
+    deps: ["k8s:platform"]
+    cmds:
+      - scripts/k8s/seed-secrets.sh
+      - kubectl --context "${MINIKUBE_PROFILE:-iap-portal}" apply -f deploy/local/portal.yaml
+      - kubectl --context "${MINIKUBE_PROFILE:-iap-portal}" -n iap-portal rollout status deploy/postgres --timeout=120s
+      - kubectl --context "${MINIKUBE_PROFILE:-iap-portal}" -n iap-portal rollout status deploy/mock-idp --timeout=120s
+      - kubectl --context "${MINIKUBE_PROFILE:-iap-portal}" -n iap-portal rollout status deploy/portal   --timeout=180s
+
+  "k8s:apps":
+    desc: "Helm install the example apps against the minikube cluster"
+    deps: ["k8s:portal"]
+    cmds:
+      # Pre-create each app's namespace with the labels Istio + the Gateway's
+      # allowedRoutes selector need. The chart no longer manages the namespace,
+      # so this runs once per app, outside of Helm.
+      # Registration uses workload identity; no credential is copied.
+      - |
+        for slug in streamlit-example fastapi-sse; do
+          scripts/k8s/prep-app-namespace.sh "${slug}" "${MINIKUBE_PROFILE:-iap-portal}"
+        done
+      - |
+        helm --kube-context "${MINIKUBE_PROFILE:-iap-portal}" upgrade --install streamlit-example ./charts/iap-app \
+          --namespace iap-app-streamlit-example \
+          -f deploy/local/values-local.yaml \
+          -f examples/streamlit-app/values-local.yaml
+      - |
+        helm --kube-context "${MINIKUBE_PROFILE:-iap-portal}" upgrade --install fastapi-sse ./charts/iap-app \
+          --namespace iap-app-fastapi-sse \
+          -f deploy/local/values-local.yaml \
+          -f examples/fastapi-sse/values-local.yaml
+
+  "k8s:hosts":
+    desc: "Pin *.iapportal.test → 127.0.0.1 in /etc/hosts (idempotent)"
+    cmds:
+      - scripts/k8s/hosts.sh
+
+  "k8s:forward":
+    desc: "Port-forward the Istio gateway to localhost:80 (Ctrl-C to stop)"
+    cmds:
+      - scripts/k8s/gateway-forward.sh
+
+  "k8s:deploy":
+    desc: "One-shot: build images, apply platform, deploy portal + apps, pin hosts"
+    cmds:
+      - task: "k8s:images"
+      - task: "k8s:platform"
+      - task: "k8s:portal"
+      - task: "k8s:apps"
+      - task: "k8s:hosts"
+      - |
+        echo ""
+        echo "Stack is up. In another terminal:  task k8s:forward"
+        echo "Then open:                         http://portal.iapportal.test"
+
+  "k8s:down":
+    desc: "Delete the minikube profile (wipes everything)"
+    cmds:
+      - minikube -p "${MINIKUBE_PROFILE:-iap-portal}" delete
+
+  # --------------------------------------------------------------------
+  # Tests
+  # --------------------------------------------------------------------
+  test:
+    desc: "Python and Helm configuration tests"
+    cmds:
+      - uv run pytest backend/tests sdk/tests tests -q
+
+  "test:backend":
+    desc: "Backend pytest"
+    deps: ["dev:setup"]
+    dir: backend
+    cmds:
+      - uv run pytest -q
+
+  "test:sdk":
+    desc: "SDK pytest"
+    deps: ["dev:setup"]
+    dir: sdk
+    cmds:
+      - uv run pytest -q
+
+  "deps:export":
+    desc: "Regenerate backend/requirements.lock (portal image dependencies) from uv.lock"
+    cmds:
+      - uv export --frozen --package iap-portal-server --no-dev --no-emit-workspace --no-emit-project -o backend/requirements.lock -q
+
+  "package:charts":
+    desc: "Build local Helm chart archives (no publication)"
+    cmds:
+      - bash scripts/package-charts.sh
+
+  "check:portability":
+    desc: "Check portable source, charts, and Compose configuration"
+    cmds:
+      - uv run python scripts/check_portability.py
+      - helm lint charts/iap-app --set slug=demo --set image.repository=example/demo
+      - helm lint deploy/platform/portal-chart --set image.repository=example/portal
+      - docker compose --profile full config --quiet
+
+  # --------------------------------------------------------------------
+  # Lint
+  # --------------------------------------------------------------------
+  lint:
+    desc: "Lint backend + sdk + frontend"
+    deps: ["lint:backend", "lint:sdk", "lint:frontend"]
+
+  "lint:backend":
+    deps: ["dev:setup"]
+    dir: backend
+    cmds:
+      - uv run ruff check src
+
+  "lint:sdk":
+    deps: ["dev:setup"]
+    dir: sdk
+    cmds:
+      - uv run ruff check src
+
+  "lint:frontend":
+    dir: frontend
+    cmds:
+      - npm run lint

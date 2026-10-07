@@ -1,0 +1,55 @@
+# Example namespaced permissions for one app's deployers (CI identity or team).
+# Apply per app namespace, replacing iap-app-demo and the subject.
+#
+# This is the tenant boundary IAP Portal assumes: deployers may manage the
+# resources the iap-app chart creates in their own namespace, and nothing else.
+# Do not grant them: Namespace objects, RBAC, ReferenceGrants, or Istio
+# networking APIs (ServiceEntry, DestinationRule, VirtualService, EnvoyFilter,
+# Sidecar, WorkloadEntry), which can affect traffic outside the namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: iap-app-deployer
+  namespace: iap-app-demo
+rules:
+  - apiGroups: [""]
+    resources: [services, serviceaccounts, secrets, configmaps]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods, pods/log, events]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [httproutes]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [security.istio.io]
+    resources: [authorizationpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [external-secrets.io]
+    resources: [externalsecrets]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: iap-app-deployer
+  namespace: iap-app-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: iap-app-deployer
+subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: iap-app-demo

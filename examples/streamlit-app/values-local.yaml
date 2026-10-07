@@ -1,0 +1,12 @@
+slug: streamlit-example
+displayName: Streamlit Example
+port: 8090
+
+image:
+  repository: iap-portal/streamlit-example
+
+healthCheck:
+  path: /_stcore/health
+
+registration:
+  owners: [alice@example.com]

@@ -1,0 +1,14 @@
+slug: fastapi-sse
+displayName: FastAPI SSE
+description: Demo FastAPI app with token-streaming endpoint for SSE validation.
+port: 8090
+
+framework: fastapi
+entrypoint: app:app
+
+registration:
+  owners:
+    - alice@example.com
+
+healthCheck:
+  path: /healthz

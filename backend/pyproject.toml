@@ -1,0 +1,46 @@
+[project]
+name = "iap-portal-server"
+version = "0.1.0"
+license = "Apache-2.0"
+description = "Portal backend: OIDC, RBAC, ext_authz, app registry"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "authlib>=1.3",
+    "httpx>=0.27",
+    "itsdangerous>=2.2",
+    "pyjwt[crypto]>=2.9",
+    "cryptography>=43",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.29",
+    "alembic>=1.13",
+    "pydantic[email]>=2.8",
+    "pydantic-settings>=2.4",
+    "python-multipart>=0.0.9",
+    "structlog>=24.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "aiosqlite>=0.20",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/iap_portal_server"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

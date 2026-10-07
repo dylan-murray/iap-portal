@@ -1,0 +1,21 @@
+# Declarative app definition. This file is consumed by two things:
+#   - `iap-portal dev` reads `framework` / `entrypoint` / `slug` / `port` to run
+#     your app locally.
+#   - The deploy workflow passes this file to `helm upgrade --values`, so every
+#     other field mirrors the iap-app chart's values schema.
+
+slug: {{SLUG}}
+displayName: {{SLUG}}
+description: ""
+port: 8080
+
+# Local-dev metadata (ignored by Helm).
+framework: {{FRAMEWORK}}
+entrypoint: app.py
+
+registration:
+  owners: []               # your team's emails
+  iconUrl: ""
+
+secrets:
+  existingSecret: ""  # optional Kubernetes Secret in this app's namespace

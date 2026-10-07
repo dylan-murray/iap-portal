@@ -1,0 +1,41 @@
+# Registers the portal as an ext_authz extensionProvider in Istio's MeshConfig.
+# Same provider settings as deploy/platform/mesh-config-patch.yaml.
+# Applied separately from platform.yaml because it uses an IstioOperator and
+# needs `istioctl install` rather than `kubectl apply`.
+#
+# Apply:   istioctl install -y -f deploy/local/mesh-config-patch.yaml \
+#                             --set profile=ambient
+
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: controlplane
+spec:
+  profile: ambient
+  meshConfig:
+    extensionProviders:
+      - name: iap-portal-ext-authz
+        envoyExtAuthzHttp:
+          service: portal.iap-portal.svc.cluster.local
+          # Dedicated listener; the portal L4 policy requires the gateway identity.
+          port: 8091
+          timeout: 2s
+          pathPrefix: /auth/verify
+          includeRequestHeadersInCheck:
+            - cookie
+            - origin
+            - x-forwarded-for
+            - user-agent
+          headersToDownstreamOnDeny:
+            - location
+            - set-cookie
+            - content-type
+            - cache-control
+          headersToUpstreamOnAllow:
+            - x-forwarded-email
+            - x-forwarded-user
+            - x-forwarded-name
+            - x-forwarded-groups
+            - x-iap-portal-app
+            - authorization
+            - cookie

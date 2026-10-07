@@ -1,0 +1,199 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.serviceAccount.name }}
+# The token is needed only to call TokenReview for app registration.
+automountServiceAccountToken: {{ .Values.kubernetesRegistration.enabled }}
+---
+{{- if .Values.kubernetesRegistration.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: iap-portal-{{ .Release.Namespace }}-token-review
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccount.name }}
+    namespace: {{ .Release.Namespace }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels: {app: portal}
+  template:
+    metadata:
+      labels: {app: portal}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- with .Values.image.pullSecret }}
+      imagePullSecrets:
+        - name: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        {{- range list (dict "name" "portal" "port" 8090 "factory" "iap_portal_server.main:create_app") (dict "name" "authorization" "port" 8091 "factory" "iap_portal_server.main:create_authorization_app") }}
+        - name: {{ .name }}
+          image: "{{ required "image.repository is required" $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          command: [uvicorn]
+          args: [{{ .factory | quote }}, "--factory", "--host", "0.0.0.0", "--port", {{ .port | quote }}]
+          ports:
+            - {name: {{ .name }}, containerPort: {{ .port }}}
+          envFrom:
+            - secretRef:
+                name: {{ $.Values.portal.existingSecret | quote }}
+          env:
+            - {name: PORTAL_ENV, value: production}
+            - name: PORTAL_DISPLAY_NAME
+              value: {{ $.Values.portal.displayName | quote }}
+            - name: PORTAL_PORTAL_BASE_URL
+              value: {{ $.Values.portal.baseUrl | quote }}
+            - name: PORTAL_APPS_DOMAIN
+              value: {{ $.Values.portal.appsDomain | quote }}
+            - name: PORTAL_ADMIN_EMAILS
+              value: {{ $.Values.portal.adminEmails | quote }}
+            - name: PORTAL_OKTA_ISSUER
+              value: {{ if $.Values.portal.auth.okta.enabled }}{{ required "portal.auth.okta.issuer is required when okta is enabled" $.Values.portal.auth.okta.issuer | quote }}{{ else }}""{{ end }}
+            - name: PORTAL_OKTA_CLIENT_ID
+              value: {{ if $.Values.portal.auth.okta.enabled }}{{ required "portal.auth.okta.clientId is required when okta is enabled" $.Values.portal.auth.okta.clientId | quote }}{{ else }}""{{ end }}
+            - name: PORTAL_GOOGLE_CLIENT_ID
+              value: {{ if $.Values.portal.auth.google.enabled }}{{ required "portal.auth.google.clientId is required when google is enabled" $.Values.portal.auth.google.clientId | quote }}{{ else }}""{{ end }}
+            - name: PORTAL_OKTA_CLIENT_SECRET
+              {{- if $.Values.portal.auth.okta.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "portal.auth.okta.clientSecretRef.name is required when okta is enabled" $.Values.portal.auth.okta.clientSecretRef.name | quote }}
+                  key: {{ required "portal.auth.okta.clientSecretRef.key is required when okta is enabled" $.Values.portal.auth.okta.clientSecretRef.key | quote }}
+              {{- else }}
+              value: ""
+              {{- end }}
+            - name: PORTAL_GOOGLE_CLIENT_SECRET
+              {{- if $.Values.portal.auth.google.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "portal.auth.google.clientSecretRef.name is required when google is enabled" $.Values.portal.auth.google.clientSecretRef.name | quote }}
+                  key: {{ required "portal.auth.google.clientSecretRef.key is required when google is enabled" $.Values.portal.auth.google.clientSecretRef.key | quote }}
+              {{- else }}
+              value: ""
+              {{- end }}
+            - name: PORTAL_ALLOWED_EMAIL_DOMAINS
+              value: {{ $.Values.portal.allowedEmailDomains | toJson | quote }}
+            - name: PORTAL_GOOGLE_HOSTED_DOMAINS
+              value: {{ $.Values.portal.googleHostedDomains | toJson | quote }}
+            - name: PORTAL_LINK_VERIFIED_EMAIL_ACROSS_ISSUERS
+              value: {{ $.Values.portal.linkVerifiedEmailAcrossIssuers | quote }}
+            - name: PORTAL_TRUSTED_PROXY_HOPS
+              value: {{ $.Values.portal.trustedProxyHops | quote }}
+            - name: PORTAL_KUBERNETES_REGISTRATION_ENABLED
+              value: {{ $.Values.kubernetesRegistration.enabled | quote }}
+            - name: PORTAL_KUBERNETES_TOKEN_AUDIENCE
+              value: {{ $.Values.kubernetesRegistration.audience | quote }}
+            - name: PORTAL_APP_NAMESPACE_PREFIX
+              value: {{ $.Values.kubernetesRegistration.appNamespacePrefix | quote }}
+            - name: PORTAL_REGISTRATION_SERVICE_ACCOUNT
+              value: {{ $.Values.kubernetesRegistration.serviceAccountName | quote }}
+            - name: PORTAL_JWT_KID
+              value: {{ $.Values.portal.jwtKid | quote }}
+            - {name: PORTAL_JWT_PRIVATE_KEY_PEM_FILE, value: /app/keys/private.pem}
+            - {name: PORTAL_JWT_PUBLIC_KEY_PEM_FILE, value: /app/keys/public.pem}
+            {{- if $.Values.portal.jwtPreviousKeysSecret }}
+            - {name: PORTAL_JWT_ADDITIONAL_PUBLIC_KEYS_DIR, value: /app/keys-previous}
+            {{- end }}
+            - {name: PYTHONDONTWRITEBYTECODE, value: "1"}
+          volumeMounts:
+            - {name: jwt-keys, mountPath: /app/keys, readOnly: true}
+            {{- if $.Values.portal.jwtPreviousKeysSecret }}
+            - {name: jwt-previous-keys, mountPath: /app/keys-previous, readOnly: true}
+            {{- end }}
+            - {name: tmp, mountPath: /tmp}
+          startupProbe:
+            # Allows time for schema migrations on upgrade.
+            httpGet: {path: /healthz, port: {{ .name }}}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /healthz/security, port: {{ .name }}}
+          livenessProbe:
+            httpGet: {path: /healthz, port: {{ .name }}}
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: jwt-keys
+          secret:
+            secretName: {{ .Values.portal.jwtSecret | quote }}
+        {{- with .Values.portal.jwtPreviousKeysSecret }}
+        - name: jwt-previous-keys
+          secret:
+            secretName: {{ . | quote }}
+        {{- end }}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal
+spec:
+  type: ClusterIP
+  selector: {app: portal}
+  ports:
+    - {name: http, port: 8090, targetPort: portal}
+    - {name: http-auth, port: 8091, targetPort: authorization}
+{{- if .Values.httpRoute.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: portal
+spec:
+  parentRefs:
+    - name: {{ .Values.httpRoute.gateway.name }}
+      namespace: {{ .Values.httpRoute.gateway.namespace }}
+      sectionName: {{ .Values.httpRoute.gateway.sectionName }}
+  hostnames:
+    - {{ .Values.httpRoute.hostname | quote }}
+  rules:
+    - backendRefs:
+        - name: portal
+          port: 8090
+{{- end }}
+
+---
+# Port 8090 serves portal/API/JWKS/registration. Only the gateway identity may
+# call the private ext_authz listener, even if an app has a valid session cookie.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: portal-listeners
+spec:
+  selector:
+    matchLabels: {app: portal}
+  action: ALLOW
+  rules:
+    - to:
+        - operation:
+            ports: ["8090"]
+    - from:
+        - source:
+            principals:
+              - {{ .Values.authorization.gatewayPrincipal | quote }}
+      to:
+        - operation:
+            ports: ["8091"]

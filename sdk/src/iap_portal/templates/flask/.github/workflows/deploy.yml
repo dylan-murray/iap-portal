@@ -1,0 +1,21 @@
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  deploy:
+    uses: {{PLATFORM_REPO}}/.github/workflows/deploy-iap-app.yml@main
+    with:
+      app-slug: {{SLUG}}
+      platform-repository: {{PLATFORM_REPO}}
+      registry: ${{ vars.IAP_REGISTRY || 'ghcr.io' }}
+      image-repository: ${{ vars.IAP_IMAGE_REPOSITORY }}
+      base-image: ${{ vars.IAP_BASE_IMAGE }}
+      runner: ${{ vars.IAP_DEPLOY_RUNNER || '["ubuntu-latest"]' }}
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}

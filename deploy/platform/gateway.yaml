@@ -1,0 +1,30 @@
+# The shared Gateway. Every app's HTTPRoute attaches here.
+# Supply the wildcard TLS Secret using your certificate provider.
+# Only HTTPRoutes from namespaces labeled iap-apps/routable=true may attach, and
+# route-admission-policy.yaml binds each app namespace to its own hostname.
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: iap-apps-gateway
+  namespace: iap-gateway
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.apps.example.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: iap-apps-wildcard-tls
+            kind: Secret
+      allowedRoutes:
+        kinds:
+          - kind: HTTPRoute
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              iap-apps/routable: "true"   # app namespaces carry this label

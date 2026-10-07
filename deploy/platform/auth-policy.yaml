@@ -1,0 +1,55 @@
+# Every request through the shared gateway, except to the portal host itself,
+# passes through the portal's /auth/verify (action: CUSTOM, provider defined in
+# mesh-config-patch.yaml):
+#   200 → identity headers and an app-scoped JWT replace client headers upstream
+#   302 → sign-in redirect / app session cookie set on the deny path
+#   other → request denied (malformed or unknown hosts, no access, portal errors)
+# The portal serves its own UI/API and authenticates it itself. /auth/verify
+# denies the portal host anyway, so a host spelling that escapes `notHosts`
+# fails closed instead of bypassing authentication.
+#
+# Replace apps.example.com with your domain. Do not add an ALLOW policy on this
+# gateway: CUSTOM and ALLOW must then both allow a request.
+
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: require-portal-auth
+  namespace: iap-gateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: iap-apps-gateway
+  action: CUSTOM
+  provider:
+    name: iap-portal-ext-authz       # matches mesh-config-patch.yaml
+  rules:
+    - to:
+        - operation:
+            notHosts:
+              - "portal.apps.example.com"
+              - "portal.apps.example.com:443"
+---
+# Internal-only portal endpoints are not reachable through the public gateway.
+# (/auth/verify is called by the gateway directly on the in-cluster Service.)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-portal-internal-paths
+  namespace: iap-gateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: iap-apps-gateway
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            hosts:
+              - "portal.apps.example.com"
+              - "portal.apps.example.com:443"
+            paths: ["/auth/verify", "/auth/verify/*"]
+            # Scope to the HTTP listener port so the rule is not applied to TCP traffic.
+            ports: ["443"]

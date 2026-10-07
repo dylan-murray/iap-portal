@@ -1,0 +1,112 @@
+{{- include "iap-app.validate" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.slug }}
+  namespace: {{ include "iap-app.namespace" . }}
+  labels:
+    {{- include "iap-app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.slug }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.slug }}
+        {{- include "iap-app.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.slug }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.image.pullSecret }}
+      imagePullSecrets:
+        - name: {{ . | quote }}
+      {{- end }}
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.port }}"
+            - name: IAP_PORTAL_APP_SLUG
+              value: {{ .Values.slug | quote }}
+            - name: IAP_PORTAL_JWKS_URL
+              value: {{ .Values.portal.jwksUrl | quote }}
+            - name: IAP_PORTAL_ISSUER
+              value: {{ include "iap-app.issuer" . | quote }}
+            - name: IAP_PORTAL_MAX_CONNECTION_AGE_SECONDS
+              value: {{ .Values.portal.maxConnectionAgeSeconds | quote }}
+            - name: IAP_PORTAL_VERIFY_JWT
+              value: "true"
+            {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- if or .Values.secrets.existingSecret .Values.secrets.external.enabled .Values.extraEnvFrom }}
+          envFrom:
+            {{- if or .Values.secrets.existingSecret .Values.secrets.external.enabled }}
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret | default "app-secrets" | quote }}
+            {{- end }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthCheck.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthCheck.path }}
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.slug }}
+  namespace: {{ include "iap-app.namespace" . }}
+  labels:
+    {{- include "iap-app.labels" . | nindent 4 }}
+automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
+---
+{{- if .Values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.slug }}
+  namespace: {{ include "iap-app.namespace" . }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.slug }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPU }}
+{{- end }}

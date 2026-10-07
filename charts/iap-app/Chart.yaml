@@ -1,0 +1,6 @@
+apiVersion: v2
+name: iap-app
+description: Reusable Helm chart for internal apps on the IAP Portal platform.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

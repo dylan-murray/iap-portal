@@ -1,0 +1,35 @@
+# Overlay for charts/iap-app when deploying to minikube.
+# Usage:
+#   helm upgrade --install streamlit-example ./charts/iap-app \
+#     -f deploy/local/values-local.yaml \
+#     -f examples/streamlit-app/values-local.yaml
+
+domain: iapportal.test
+
+image:
+  tag: local
+  pullPolicy: IfNotPresent
+
+# No external registry in minikube; images are built + loaded via scripts/k8s/load-images.sh.
+# Callers set image.repository to the local tag (e.g. iap-portal/streamlit-example).
+
+# Apps that do not need runtime secrets
+# can leave this off; apps that do can create a plain `app-secrets` Secret
+# via kubectl and rely on envFrom picking it up.
+secrets:
+  existingSecret: ""
+
+portal:
+  issuer: http://portal.iapportal.test
+
+registration:
+  # In-cluster portal URL (mesh DNS); the Job authenticates with a projected
+  # ServiceAccount token, so no credential is copied into the app namespace.
+  portalUrl: http://portal.iap-portal.svc.cluster.local:8090
+  # Registration uses a public Python image.
+  image: python:3.12-slim
+
+gateway:
+  name: iap-apps-gateway
+  namespace: iap-gateway
+  sectionName: http    # local Gateway has an HTTP listener; prod uses https
