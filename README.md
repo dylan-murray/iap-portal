@@ -24,7 +24,7 @@ share them with sign-in and access controls built in. Ship a Streamlit tool, a
 Gradio demo, a FastAPI service, or a custom web app. App owners decide who can
 use their tools from the portal.
 
-<img src="assets/portal-demo-balanced.webp" alt="IAP Portal demo: browse apps, approve an access request, grant time-limited access, and launch an interactive Streamlit app">
+<img src="assets/portal-demo-1440.webp" alt="IAP Portal demo: browse apps, approve an access request, grant time-limited access, and launch an interactive Streamlit app">
 
 ## 💡 Why iap-portal
 
